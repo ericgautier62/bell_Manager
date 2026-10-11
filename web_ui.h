@@ -1,0 +1,412 @@
+#ifndef WEB_UI_H
+#define WEB_UI_H
+#include <Arduino.h>
+
+// Interface web (generee depuis index.html) servie par WebDashboard sur "/".
+// Page autonome : aucun CDN, fonctionne sans acces Internet.
+const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#002B54">
+<title>DGCAST · Sonnerie</title>
+<link rel="icon" href="/logo.png">
+<style>
+:root{--navy:#002B54;--navy2:#0b4a8a;--orange:#DF8933;--bg:#F2F5FA;--card:#fff;--ink:#14213a;--mut:#667290;--line:#e3e8f2;--red:#d64550;--green:#1f9d6b;--sh:0 8px 28px rgba(0,43,84,.09)}
+@media (prefers-color-scheme:dark){:root{--bg:#0a1120;--card:#121b2d;--ink:#e8eefb;--mut:#93a0bd;--line:#223049;--sh:0 8px 28px rgba(0,0,0,.4)}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;cursor:pointer}
+header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top));background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.logo{width:50px;height:50px;border-radius:50%;background:#fff;padding:2px;flex:none}
+.brand{flex:1;min-width:0;line-height:1.2}
+.brand b{display:block;font-size:17px;letter-spacing:.3px}
+.brand span{display:block;font-size:11.5px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:rgba(255,255,255,.14);font-size:12.5px;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:#ff6b6b}
+.chip.ok i{background:#4be39a;box-shadow:0 0 8px #4be39a}
+main{max-width:980px;margin:0 auto;padding:18px}
+.tab{display:none;animation:in .28s ease}
+.tab.active{display:block}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.grid{display:grid;gap:16px}
+@media(min-width:820px){.grid.two{grid-template-columns:1fr 1fr}}
+.card{background:var(--card);border-radius:20px;padding:20px;box-shadow:var(--sh);border:1px solid var(--line)}
+.card h2{margin:0 0 4px;font-size:18px}
+.sub{margin:0 0 14px;color:var(--mut);font-size:14px}
+.clock{text-align:center}
+.time{font-size:clamp(46px,13vw,76px);font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums;line-height:1.05;color:var(--navy)}
+@media(prefers-color-scheme:dark){.time{color:#fff}}
+.time small{font-size:.38em;opacity:.55;margin-left:4px}
+.date{color:var(--mut);margin-top:4px;text-transform:capitalize}
+.badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.badge{padding:6px 12px;border-radius:99px;font-size:13.5px;background:var(--bg);border:1px solid var(--line)}
+.badge.school{background:rgba(31,157,107,.12);border-color:rgba(31,157,107,.4);color:var(--green)}
+.badge.hol{background:rgba(214,69,80,.12);border-color:rgba(214,69,80,.4);color:var(--red)}
+.badge.ext{background:rgba(223,137,51,.14);border-color:rgba(223,137,51,.5);color:#b86a1d}
+.next{margin-top:16px;padding:14px;border-radius:14px;background:var(--bg);text-align:center}
+.next small{display:block;color:var(--mut);font-size:12.5px;text-transform:uppercase;letter-spacing:.8px}
+.next b{font-size:22px}
+.ringwrap{text-align:center}
+.ring{position:relative;width:190px;height:190px;border-radius:50%;border:0;margin:6px auto 14px;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 30% 25%,#ffb36a,var(--orange) 55%,#c46f1c);box-shadow:0 14px 34px rgba(223,137,51,.45),inset 0 -8px 16px rgba(0,0,0,.18);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .12s}
+.ring svg{width:76px;height:76px;pointer-events:none}
+.ring.on{transform:scale(.94);background:radial-gradient(circle at 30% 25%,#ff8d80,var(--red) 60%,#a82c36);animation:pulse 1s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(214,69,80,.55)}100%{box-shadow:0 0 0 34px rgba(214,69,80,0)}}
+.ringlbl{font-weight:600;font-size:17px}
+.hint{color:var(--mut);font-size:13px;margin-top:4px}
+.warn{display:none;margin-bottom:16px;padding:14px 16px;border-radius:16px;background:rgba(214,69,80,.1);border:1px solid rgba(214,69,80,.4);color:var(--red)}
+.warn.show{display:block}
+.warn button{margin-top:10px}
+.btn{border:0;border-radius:12px;padding:11px 18px;font-weight:600;background:var(--navy);color:#fff;transition:transform .1s,opacity .2s}
+.btn:active{transform:scale(.97)}
+.btn.sec{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
+@media(prefers-color-scheme:dark){.btn.sec{color:#fff;border-color:#4a6aa0}.btn{background:#1d5cae}}
+.btn.add{width:100%;margin-top:12px;background:var(--orange)}
+.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px 12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;margin-bottom:10px;background:var(--card);transition:opacity .2s}
+.row.off{opacity:.55}
+.row input[type=time]{font:600 20px system-ui;border:1.5px solid var(--line);border-radius:10px;padding:6px 8px;background:var(--bg);color:var(--ink)}
+.pills{grid-column:1/-1;display:flex;gap:6px;justify-content:space-between}
+@media(min-width:640px){.row{grid-template-columns:auto 1fr auto auto}.pills{grid-column:2;justify-content:flex-start}}
+.pill{flex:1;max-width:44px;height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);font-weight:600;font-size:14px;color:var(--mut);transition:all .15s}
+.pill.on{background:var(--navy);border-color:var(--navy);color:#fff}
+@media(prefers-color-scheme:dark){.pill.on{background:#1d5cae;border-color:#1d5cae}}
+.sw{position:relative;width:48px;height:28px;display:inline-block}
+.sw input{opacity:0;width:0;height:0}
+.sw i{position:absolute;inset:0;background:#c5cde0;border-radius:99px;transition:.2s}
+.sw i:before{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.sw input:checked+i{background:var(--green)}
+.sw input:checked+i:before{transform:translateX(20px)}
+.icon{width:38px;height:38px;border-radius:10px;border:0;background:transparent;color:var(--mut);font-size:18px}
+.icon:hover{background:rgba(214,69,80,.12);color:var(--red)}
+.empty{color:var(--mut);text-align:center;padding:18px 0}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px;margin-bottom:10px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--mut);transition:all .15s}
+.seg button.on{background:var(--card);color:var(--navy);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+@media(prefers-color-scheme:dark){.seg button.on{color:#fff}}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin:10px 0}
+.calhead b{font-size:18px;text-transform:capitalize}
+.calhead button{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--bg);font-size:20px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .dn{text-align:center;font-size:12px;color:var(--mut);font-weight:600;padding:4px 0}
+.cal button{aspect-ratio:1;border:1.5px solid transparent;border-radius:12px;background:var(--bg);font-weight:600;font-size:15px;transition:transform .1s;position:relative}
+.cal button:active{transform:scale(.92)}
+.cal button.we{color:var(--mut)}
+.cal button.today{border-color:var(--navy)}
+@media(prefers-color-scheme:dark){.cal button.today{border-color:#fff}}
+.cal button.hol{background:var(--red);color:#fff}
+.cal button.ext{background:var(--green);color:#fff}
+.cal button.rs{outline:3px solid var(--orange)}
+.cal .pad{visibility:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:13px;color:var(--mut)}
+.legend span:before{content:"";display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+.legend .l1:before{background:var(--red)}.legend .l2:before{background:var(--green)}.legend .l3:before{border:2px solid var(--navy);border-radius:4px}
+.tpl{display:none;align-items:center;gap:10px;margin:6px 0 10px;font-size:14px}
+.tpl.show{display:flex}
+select{font:inherit;padding:8px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips .c{display:inline-flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-radius:99px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.chips .c button{width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.08);font-size:12px;line-height:1;color:inherit}
+.chips .c.h{border-color:rgba(214,69,80,.5)}.chips .c.e{border-color:rgba(31,157,107,.5)}
+h3{margin:18px 0 8px;font-size:15px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.kv:last-child{border:0}.kv span:first-child{color:var(--mut)}
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;gap:4px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(0,0,0,.08)}
+nav.bar button{flex:1;max-width:160px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;border-radius:14px;font-size:12px;font-weight:600;color:var(--mut);transition:all .15s}
+nav.bar button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav.bar button.on{color:var(--navy);background:rgba(0,43,84,.08)}
+@media(prefers-color-scheme:dark){nav.bar button.on{color:#fff;background:rgba(255,255,255,.1)}}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,30px);opacity:0;z-index:40;padding:11px 18px;border-radius:99px;background:#1c2a44;color:#fff;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:all .25s;pointer-events:none;max-width:90%}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.err{background:var(--red)}
+footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
+</style>
+</head>
+<body>
+<header class="top">
+  <img class="logo" src="/logo.png" alt="DGCAST">
+  <div class="brand"><b>DGCAST · Garoua</b><span data-i="school"></span></div>
+  <div class="chip" id="conn"><i></i><span id="connTxt">…</span></div>
+</header>
+
+<main>
+  <section id="tab-home" class="tab active">
+    <div class="warn" id="warn"><b data-i="untrusted"></b><br><button class="btn" id="syncWarn" data-i="syncNow"></button></div>
+    <div class="grid two">
+      <div class="card clock">
+        <div class="time" id="clk">--:--<small>--</small></div>
+        <div class="date" id="dt">&nbsp;</div>
+        <div class="badges"><span class="badge" id="todayB"></span></div>
+        <div class="next"><small data-i="next"></small><b id="nextB">—</b></div>
+      </div>
+      <div class="card ringwrap">
+        <h2 data-i="ringTitle"></h2>
+        <p class="sub" data-i="ringSub"></p>
+        <button class="ring" id="ring" aria-label="Sonner" oncontextmenu="return false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v9"/><path d="M6.4 6.2a8.5 8.5 0 1 0 11.2 0"/></svg>
+        </button>
+        <div class="ringlbl" id="ringLbl"></div>
+        <div class="hint" data-i="holdHint"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-sched" class="tab">
+    <div class="card">
+      <h2 data-i="schedTitle"></h2>
+      <p class="sub" data-i="schedSub"></p>
+      <div id="sched"></div>
+      <button class="btn add" id="addSched" data-i="add"></button>
+    </div>
+  </section>
+
+  <section id="tab-cal" class="tab">
+    <div class="card">
+      <h2 data-i="calTitle"></h2>
+      <div class="seg" id="seg">
+        <button data-m="h" class="on" data-i="mH"></button>
+        <button data-m="r" data-i="mR"></button>
+        <button data-m="e" data-i="mE"></button>
+      </div>
+      <p class="sub" id="modeHint"></p>
+      <div class="tpl" id="tpl"><span data-i="useSched"></span><select id="tplSel"></select></div>
+      <div class="calhead"><button id="prev" aria-label="prev">‹</button><b id="monthT"></b><button id="next" aria-label="next">›</button></div>
+      <div class="cal" id="cal"></div>
+      <div class="legend"><span class="l1" data-i="legHol"></span><span class="l2" data-i="legExt"></span><span class="l3" data-i="legToday"></span></div>
+      <h3 data-i="listHol"></h3><div class="chips" id="listH"></div>
+      <h3 data-i="listExt"></h3><div class="chips" id="listE"></div>
+      <button class="btn sec" id="fixed" style="margin-top:18px"></button>
+    </div>
+  </section>
+
+  <section id="tab-set" class="tab">
+    <div class="grid two">
+      <div class="card">
+        <h2 data-i="timeTitle"></h2>
+        <p class="sub" data-i="timeDesc"></p>
+        <div class="kv"><span data-i="devTime"></span><b id="setTime">--</b></div>
+        <div class="kv"><span data-i="timeState"></span><b id="setTrust">--</b></div>
+        <button class="btn" id="syncBtn" style="margin-top:14px" data-i="syncNow"></button>
+      </div>
+      <div class="card">
+        <h2 data-i="connTitle"></h2>
+        <div class="kv"><span data-i="addr"></span><b id="setIp">--</b></div>
+        <div class="kv"><span data-i="mdns"></span><b>kairoslab.local</b></div>
+        <div class="kv"><span data-i="device"></span><b>KAIROSLAB · ESP32-C3</b></div>
+      </div>
+    </div>
+  </section>
+  <footer>Divine Grace College of Arts, Science and Technology · Garoua</footer>
+</main>
+
+<nav class="bar" id="nav">
+  <button data-t="home" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-i="navHome"></span></button>
+  <button data-t="sched"><svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg><span data-i="navSched"></span></button>
+  <button data-t="cal"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span data-i="navCal"></span></button>
+  <button data-t="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span data-i="navSet"></span></button>
+</nav>
+<div id="toast"></div>
+<noscript>JavaScript requis / JavaScript required</noscript>
+
+<script>
+(()=>{
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const pad=n=>String(n).padStart(2,"0");
+const T={
+fr:{school:"Divine Grace College of Arts, Science and Technology",navHome:"Accueil",navSched:"Horaires",navCal:"Calendrier",navSet:"Réglages",
+online:"Connecté",offline:"Hors ligne",ringTitle:"Sonnerie manuelle",ringSub:"Maintenez le bouton pour sonner.",hold:"Maintenir pour sonner",ringing:"Sonnerie en cours…",
+holdHint:"Le relais reste fermé tant que vous maintenez le bouton.",next:"Prochaine sonnerie",none:"Aucune sonnerie prévue",today:"Aujourd'hui",tomorrow:"Demain",in:"dans",
+stSchool:"Jour de classe",stHol:"Jour férié · pas de sonnerie",stExt:"Jour exceptionnel · sonnerie active",stOff:"Pas de sonnerie aujourd'hui",
+untrusted:"L'heure n'est pas fiable : les sonneries automatiques sont suspendues.",syncNow:"Synchroniser avec cet appareil",
+schedTitle:"Horaires de sonnerie",schedSub:"Choisissez les heures et les jours concernés (par défaut du lundi au vendredi).",add:"+ Ajouter une sonnerie",noSched:"Aucune sonnerie programmée.",del:"Supprimer",
+calTitle:"Calendrier",mH:"Jour férié",mR:"Période",mE:"Exceptionnel",
+hintH:"Touchez les jours sans sonnerie (jours fériés).",hintR:"Touchez le premier puis le dernier jour de la période (vacances).",hintE:"Touchez un jour où la sonnerie doit fonctionner exceptionnellement (ex. un samedi de rattrapage).",
+rangeStart:"Début de période choisi : touchez le dernier jour.",useSched:"Appliquer l'horaire du",legHol:"Férié / vacances",legExt:"Sonnerie exceptionnelle",legToday:"Aujourd'hui",
+listHol:"Jours fériés et vacances",listExt:"Jours exceptionnels",noneList:"Aucun",fixed:"Ajouter les fériés fixes de",fixedDone:"Fériés ajoutés",
+saved:"Enregistré ✓",error:"Erreur de communication",timeTitle:"Heure de l'appareil",timeDesc:"Utilisée pour déclencher les sonneries automatiques.",devTime:"Heure actuelle",timeState:"État",trusted:"Fiable",notTrusted:"Non fiable",timeSet:"Heure synchronisée",
+connTitle:"Connexion",addr:"Adresse",mdns:"Nom local",device:"Appareil",limit:"Limite atteinte"},
+en:{school:"Divine Grace College of Arts, Science and Technology",navHome:"Home",navSched:"Schedule",navCal:"Calendar",navSet:"Settings",
+online:"Online",offline:"Offline",ringTitle:"Manual bell",ringSub:"Press and hold the button to ring.",hold:"Hold to ring",ringing:"Ringing…",
+holdHint:"The relay stays closed as long as you hold the button.",next:"Next bell",none:"No bell scheduled",today:"Today",tomorrow:"Tomorrow",in:"in",
+stSchool:"School day",stHol:"Holiday · no bell",stExt:"Exceptional day · bell active",stOff:"No bell today",
+untrusted:"The time is not reliable: automatic bells are suspended.",syncNow:"Sync with this device",
+schedTitle:"Bell schedule",schedSub:"Pick the times and the days they apply to (Monday to Friday by default).",add:"+ Add a bell",noSched:"No bell scheduled.",del:"Delete",
+calTitle:"Calendar",mH:"Holiday",mR:"Period",mE:"Exceptional",
+hintH:"Tap the days without bell (public holidays).",hintR:"Tap the first then the last day of the period (vacation).",hintE:"Tap a day when the bell must exceptionally ring (e.g. a make-up Saturday).",
+rangeStart:"Period start set: tap the last day.",useSched:"Use the schedule of",legHol:"Holiday / vacation",legExt:"Exceptional bell",legToday:"Today",
+listHol:"Holidays and vacations",listExt:"Exceptional days",noneList:"None",fixed:"Add fixed holidays for",fixedDone:"Holidays added",
+saved:"Saved ✓",error:"Communication error",timeTitle:"Device time",timeDesc:"Used to trigger the automatic bells.",devTime:"Current time",timeState:"Status",trusted:"Reliable",notTrusted:"Not reliable",timeSet:"Time synchronised",
+connTitle:"Connection",addr:"Address",mdns:"Local name",device:"Device",limit:"Limit reached"}};
+const MON={fr:["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"],en:["January","February","March","April","May","June","July","August","September","October","November","December"]};
+const DAY={fr:["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"],en:["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]};
+const ORDER=[1,2,3,4,5,6,0];
+let lang="fr";const t=k=>T[lang][k]||k;
+const S={base:Date.now(),t0:performance.now(),trusted:true,ip:"",sched:[],hol:new Set(),ext:new Map(),loaded:false};
+const devNow=()=>new Date(S.base+(performance.now()-S.t0));
+const key=d=>d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
+const keyDate=k=>{const[a,b,c]=k.split("-").map(Number);return new Date(Date.UTC(a,b-1,c))};
+const fmtLong=k=>{const d=keyDate(k);return DAY[lang][d.getUTCDay()].slice(0,3)+" "+d.getUTCDate()+" "+MON[lang][d.getUTCMonth()].slice(0,4)+". "+d.getUTCFullYear()};
+
+/* ---------- réseau ---------- */
+async function api(path,body){
+  const o=body===undefined?{cache:"no-store"}:{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body};
+  const r=await fetch(path,o);if(!r.ok)throw new Error(r.status);return r.json();
+}
+let toastT;
+function toast(m,err){const e=$("#toast");e.textContent=m;e.className="show"+(err?" err":"");clearTimeout(toastT);toastT=setTimeout(()=>e.className="",2200)}
+async function post(path,data){try{await api(path,"data="+encodeURIComponent(data));toast(t("saved"))}catch(e){toast(t("error"),1)}}
+const timers={};const debounce=(k,f,ms=450)=>{clearTimeout(timers[k]);timers[k]=setTimeout(f,ms)};
+function prune(){const lim=new Date(devNow().getTime()-30*864e5);const lk=key(lim);
+  for(const k of [...S.hol])if(k<lk)S.hol.delete(k);for(const k of [...S.ext.keys()])if(k<lk)S.ext.delete(k)}
+const saveSched=()=>debounce("s",()=>post("/api/schedules",S.sched.map(s=>s.h+":"+s.m+":"+s.mask+":"+(s.en?1:0)).join(",")));
+const saveHol=()=>{prune();debounce("h",()=>post("/api/holidays",[...S.hol].sort().join(",")),250)};
+const saveExt=()=>{prune();debounce("e",()=>post("/api/extras",[...S.ext].sort().map(([k,v])=>k+":"+v).join(",")),250)};
+
+async function load(full){
+  try{
+    const d=await api("/api/state");
+    const[dd,tt]=d.now.split(" ");const[Y,M,D]=dd.split("-").map(Number);const[h,mi,s]=tt.split(":").map(Number);
+    S.base=Date.UTC(Y,M-1,D,h,mi,s);S.t0=performance.now();S.trusted=d.trusted;S.ip=d.ip;
+    if(d.lang!==lang){lang=d.lang;applyLang()}
+    if(full||!S.loaded){
+      S.sched=d.sched.map(a=>({h:a[0],m:a[1],mask:a[2],en:!!a[3]}));S.hol=new Set(d.holidays);S.ext=new Map(d.extras);S.loaded=true;
+      if(!cal.y){const n=devNow();cal.y=n.getUTCFullYear();cal.m=n.getUTCMonth()}
+      renderSched();renderCal();
+    }
+    online(true);renderHome();
+  }catch(e){online(false)}
+}
+function online(ok){$("#conn").className="chip"+(ok?" ok":"");$("#connTxt").textContent=ok?t("online"):t("offline")}
+
+/* ---------- i18n ---------- */
+function applyLang(){
+  document.documentElement.lang=lang;
+  $$("[data-i]").forEach(e=>e.textContent=t(e.dataset.i));
+  $("#ringLbl").textContent=ringing?t("ringing"):t("hold");
+  const sel=$("#tplSel");const v=sel.value||"1";sel.innerHTML=ORDER.map(d=>`<option value="${d}">${DAY[lang][d]}</option>`).join("");sel.value=v;
+  setMode(mode);renderSched();renderCal();renderHome();
+}
+
+/* ---------- accueil ---------- */
+function effDow(d){const k=key(d);if(S.ext.has(k))return S.ext.get(k);if(S.hol.has(k))return-1;return d.getUTCDay()}
+function nextRing(now){
+  for(let i=0;i<=21;i++){
+    const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+i));const e=effDow(d);if(e<0)continue;
+    const list=S.sched.filter(s=>s.en&&(s.mask>>e&1)).map(s=>s.h*60+s.m).sort((a,b)=>a-b);
+    for(const m of list){const ts=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),0,m);if(ts>now.getTime())return{ts,d,m,days:i}}
+  }return null}
+function renderClock(){
+  const n=devNow();
+  $("#clk").innerHTML=pad(n.getUTCHours())+":"+pad(n.getUTCMinutes())+"<small>"+pad(n.getUTCSeconds())+"</small>";
+  $("#dt").textContent=DAY[lang][n.getUTCDay()]+" "+n.getUTCDate()+" "+MON[lang][n.getUTCMonth()]+" "+n.getUTCFullYear();
+  $("#setTime").textContent=key(n)+" "+pad(n.getUTCHours())+":"+pad(n.getUTCMinutes())+":"+pad(n.getUTCSeconds());
+}
+function renderHome(){
+  const n=devNow(),k=key(n);let c="school",txt=t("stSchool");
+  if(S.ext.has(k)){c="ext";txt=t("stExt")}else if(S.hol.has(k)){c="hol";txt=t("stHol")}
+  else if(!S.sched.some(s=>s.en&&(s.mask>>n.getUTCDay()&1))){c="";txt=t("stOff")}
+  const b=$("#todayB");b.className="badge "+c;b.textContent=txt;
+  const nx=nextRing(n);let out=t("none");
+  if(nx){const hh=pad(Math.floor(nx.m/60))+":"+pad(nx.m%60);const diff=Math.round((nx.ts-n.getTime())/6e4);
+    let when=nx.days===0?t("today"):nx.days===1?t("tomorrow"):fmtLong(key(nx.d));
+    let dur=diff<60?diff+" min":diff<1440?Math.floor(diff/60)+" h "+pad(diff%60):Math.round(diff/1440)+" j";
+    out=when+" · "+hh+" ("+t("in")+" "+dur+")"}
+  $("#nextB").textContent=out;
+  $("#warn").className="warn"+(S.trusted?"":" show");
+  $("#setTrust").textContent=S.trusted?t("trusted"):t("notTrusted");$("#setIp").textContent=S.ip||"--";
+  renderClock();
+}
+setInterval(renderClock,250);setInterval(renderHome,5000);
+
+/* ---------- sonnerie manuelle (maintien) ---------- */
+let ringing=false,ringIv=null;const ringBtn=$("#ring");
+const sendRing=on=>fetch("/api/ring",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"on="+on,keepalive:true}).catch(()=>{});
+function ringStart(){if(ringing)return;ringing=true;ringBtn.classList.add("on");$("#ringLbl").textContent=t("ringing");
+  if(navigator.vibrate)navigator.vibrate(40);sendRing(1);ringIv=setInterval(()=>sendRing(1),400)}
+function ringStop(){if(!ringing)return;ringing=false;clearInterval(ringIv);ringBtn.classList.remove("on");$("#ringLbl").textContent=t("hold");
+  sendRing(0);setTimeout(()=>sendRing(0),250)}
+ringBtn.addEventListener("pointerdown",e=>{e.preventDefault();try{ringBtn.setPointerCapture(e.pointerId)}catch(_){}ringStart()});
+["pointerup","pointercancel","lostpointercapture"].forEach(ev=>ringBtn.addEventListener(ev,ringStop));
+window.addEventListener("blur",ringStop);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)ringStop();else load(false)});
+
+/* ---------- horaires ---------- */
+function renderSched(){
+  const box=$("#sched");box.innerHTML="";
+  if(!S.sched.length)box.innerHTML=`<p class="empty">${t("noSched")}</p>`;
+  S.sched.forEach((s,i)=>{
+    const row=document.createElement("div");row.className="row"+(s.en?"":" off");
+    row.innerHTML=`<input type="time" value="${pad(s.h)}:${pad(s.m)}"><span></span><label class="sw"><input type="checkbox" ${s.en?"checked":""}><i></i></label><button class="icon" title="${t("del")}">✕</button><div class="pills">${ORDER.map(d=>`<button class="pill${s.mask>>d&1?" on":""}" data-d="${d}" title="${DAY[lang][d]}">${DAY[lang][d][0].toUpperCase()}</button>`).join("")}</div>`;
+    row.querySelector("input[type=time]").onchange=e=>{const v=e.target.value.split(":");if(v.length<2)return;s.h=+v[0];s.m=+v[1];S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
+    row.querySelector(".sw input").onchange=e=>{s.en=e.target.checked;row.classList.toggle("off",!s.en);saveSched();renderHome()};
+    row.querySelector(".icon").onclick=()=>{S.sched.splice(i,1);saveSched();renderSched();renderHome()};
+    row.querySelectorAll(".pill").forEach(p=>p.onclick=()=>{s.mask^=1<<+p.dataset.d;p.classList.toggle("on");saveSched();renderHome()});
+    box.appendChild(row);
+  });
+}
+$("#addSched").onclick=()=>{if(S.sched.length>=20)return toast(t("limit"),1);S.sched.push({h:7,m:30,mask:62,en:true});S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
+
+/* ---------- calendrier ---------- */
+const cal={y:0,m:0};let mode="h",rangeA=null;
+function setMode(m){mode=m;rangeA=null;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
+  $("#modeHint").textContent=t(m==="h"?"hintH":m==="r"?"hintR":"hintE");$("#tpl").className="tpl"+(m==="e"?" show":"");renderCal()}
+$$("#seg button").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$("#prev").onclick=()=>{if(--cal.m<0){cal.m=11;cal.y--}renderCal()};
+$("#next").onclick=()=>{if(++cal.m>11){cal.m=0;cal.y++}renderCal()};
+function renderCal(){
+  if(!cal.y)return;
+  $("#monthT").textContent=MON[lang][cal.m]+" "+cal.y;
+  const g=$("#cal");g.innerHTML="";
+  ORDER.forEach(d=>{const e=document.createElement("div");e.className="dn";e.textContent=DAY[lang][d].slice(0,3);g.appendChild(e)});
+  const first=new Date(Date.UTC(cal.y,cal.m,1)),off=(first.getUTCDay()+6)%7,n=new Date(Date.UTC(cal.y,cal.m+1,0)).getUTCDate(),today=key(devNow());
+  for(let i=0;i<off;i++){const p=document.createElement("button");p.className="pad";g.appendChild(p)}
+  for(let d=1;d<=n;d++){
+    const k=cal.y+"-"+pad(cal.m+1)+"-"+pad(d),dow=new Date(Date.UTC(cal.y,cal.m,d)).getUTCDay(),b=document.createElement("button");
+    b.textContent=d;b.className=(dow===0||dow===6?"we ":"")+(k===today?"today ":"")+(S.hol.has(k)?"hol ":"")+(S.ext.has(k)?"ext ":"")+(rangeA===k?"rs":"");
+    b.onclick=()=>tapDay(k);g.appendChild(b);
+  }
+  const lh=$("#listH"),le=$("#listE");lh.innerHTML="";le.innerHTML="";
+  const mk=(box,k,cls,extra,fn)=>{const c=document.createElement("span");c.className="c "+cls;c.innerHTML=`${fmtLong(k)}${extra}<button>✕</button>`;c.querySelector("button").onclick=fn;box.appendChild(c)};
+  [...S.hol].sort().forEach(k=>mk(lh,k,"h","",()=>{S.hol.delete(k);saveHol();renderCal();renderHome()}));
+  [...S.ext].sort().forEach(([k,v])=>mk(le,k,"e"," · "+DAY[lang][v].slice(0,3)+".",()=>{S.ext.delete(k);saveExt();renderCal();renderHome()}));
+  if(!S.hol.size)lh.innerHTML=`<span class="hint">${t("noneList")}</span>`;
+  if(!S.ext.size)le.innerHTML=`<span class="hint">${t("noneList")}</span>`;
+  $("#fixed").textContent=t("fixed")+" "+cal.y;
+}
+function tapDay(k){
+  if(mode==="h"){if(S.hol.has(k))S.hol.delete(k);else{if(S.hol.size>=200)return toast(t("limit"),1);S.hol.add(k);S.ext.delete(k)}saveHol();saveExt()}
+  else if(mode==="e"){if(S.ext.has(k))S.ext.delete(k);else{S.ext.set(k,+$("#tplSel").value);S.hol.delete(k)}saveExt();saveHol()}
+  else{
+    if(!rangeA){rangeA=k;toast(t("rangeStart"))}
+    else{let a=keyDate(rangeA),b=keyDate(k);if(a>b)[a,b]=[b,a];
+      for(let d=a;d<=b&&S.hol.size<200;d=new Date(d.getTime()+864e5)){const kk=key(d);S.hol.add(kk);S.ext.delete(kk)}
+      rangeA=null;saveHol();saveExt()}
+  }
+  renderCal();renderHome();
+}
+$("#fixed").onclick=()=>{["01-01","02-11","05-01","05-20","08-15","12-25"].forEach(md=>{const k=cal.y+"-"+md;if(!S.ext.has(k))S.hol.add(k)});saveHol();renderCal();renderHome();toast(t("fixedDone"))};
+
+/* ---------- heure ---------- */
+async function syncTime(){
+  const n=new Date(),s=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate())+"T"+pad(n.getHours())+":"+pad(n.getMinutes())+":"+pad(n.getSeconds());
+  try{await api("/api/time","data="+encodeURIComponent(s));toast(t("timeSet"));load(false)}catch(e){toast(t("error"),1)}
+}
+$("#syncBtn").onclick=syncTime;$("#syncWarn").onclick=syncTime;
+
+/* ---------- navigation ---------- */
+$$("#nav button").forEach(b=>b.onclick=()=>{
+  $$("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  $$(".tab").forEach(s=>s.classList.toggle("active",s.id==="tab-"+b.dataset.t));
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+applyLang();load(true);setInterval(()=>load(false),4000);
+})();
+</script>
+</body>
+</html>
+)rawliteral";
+
+#endif
