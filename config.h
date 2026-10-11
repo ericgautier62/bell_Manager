@@ -15,15 +15,12 @@
 
 // Relais de sonnerie (GPIO5 : libre, ni strapping ni LED)
 #define PIN_RELAY 5
-// Modules relais "opto" bon marché : déclenchés au niveau BAS.
-// Mettre false si le tien s'active au niveau HAUT.
-#define RELAY_ACTIVE_LOW true
+// Ce module relais s'active au niveau HAUT.
+// Mettre true si le tien s'active au niveau BAS.
+#define RELAY_ACTIVE_LOW false
 
 // ---------------- Sonnerie ----------------
-// Motif automatique (horaires programmés) : plusieurs impulsions courtes
-#define BELL_PULSE_COUNT   3
-#define BELL_PULSE_ON_MS   400
-#define BELL_PULSE_OFF_MS  300
+// La durée continue des sonneries programmées est réglée pour chaque horaire.
 
 // Sonnerie "maintenue" (écran OLED ou bouton web) :
 // le relais reste fermé tant que le bouton est maintenu...

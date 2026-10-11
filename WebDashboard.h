@@ -36,6 +36,7 @@ private:
     void handleRoot();
     void handleLogo();
     void handleState();
+    void handleSettings();
     void handleSchedules();
     void handleHolidays();
     void handleExtras();

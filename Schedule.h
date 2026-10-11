@@ -11,6 +11,7 @@ struct ScheduleEntry {
     uint8_t minute;
     uint8_t daysMask;
     bool enabled;
+    uint8_t durationSeconds;
 };
 
 #endif

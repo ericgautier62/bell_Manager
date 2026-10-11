@@ -17,18 +17,17 @@ void RelayController::setRelay(bool on) {
     digitalWrite(_pin, level ? HIGH : LOW);
 }
 
-void RelayController::ringNow(uint8_t pulseCount, uint16_t pulseOnMs, uint16_t pulseOffMs) {
-    if (_held) return;
-    for (uint8_t i = 0; i < pulseCount; i++) {
-        setRelay(true);
-        delay(pulseOnMs);
-        setRelay(false);
-        if (i < pulseCount - 1) delay(pulseOffMs);
-    }
+void RelayController::ringFor(uint32_t durationMs) {
+    if (_held || durationMs == 0) return;
+    _timedRinging = true;
+    _ringStarted = millis();
+    _ringDurationMs = durationMs;
+    setRelay(true);
 }
 
 void RelayController::holdOn() {
     if (!_held) {
+        _timedRinging = false;
         _held = true;
         _heldSince = millis();
         setRelay(true);
@@ -37,6 +36,7 @@ void RelayController::holdOn() {
 }
 
 void RelayController::holdOff() {
+    if (!_held) return;
     _held = false;
     setRelay(false);
 }
@@ -46,9 +46,12 @@ void RelayController::feedHold() {
 }
 
 void RelayController::update() {
-    if (!_held) return;
     unsigned long now = millis();
-    if (now - _lastFeed > BELL_HOLD_WATCHDOG_MS || now - _heldSince > BELL_HOLD_MAX_MS) {
+    if (_timedRinging && now - _ringStarted >= _ringDurationMs) {
+        _timedRinging = false;
+        setRelay(false);
+    }
+    if (_held && (now - _lastFeed > BELL_HOLD_WATCHDOG_MS || now - _heldSince > BELL_HOLD_MAX_MS)) {
         holdOff();
     }
 }

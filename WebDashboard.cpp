@@ -33,6 +33,7 @@ void WebDashboard::setupRoutes() {
     _server.on("/", HTTP_GET, [this]() { handleRoot(); });
     _server.on("/logo.png", HTTP_GET, [this]() { handleLogo(); });
     _server.on("/api/state", HTTP_GET, [this]() { handleState(); });
+    _server.on("/api/settings", HTTP_POST, [this]() { handleSettings(); });
     _server.on("/api/schedules", HTTP_POST, [this]() { handleSchedules(); });
     _server.on("/api/holidays", HTTP_POST, [this]() { handleHolidays(); });
     _server.on("/api/extras", HTTP_POST, [this]() { handleExtras(); });
@@ -82,7 +83,7 @@ void WebDashboard::handleState() {
     for (uint8_t i = 0; i < _sched.getCount(); i++) {
         const ScheduleEntry& e = _sched.getEntry(i);
         if (i) j += ",";
-        snprintf(buf, sizeof(buf), "[%u,%u,%u,%u]", e.hour, e.minute, e.daysMask, e.enabled ? 1 : 0);
+        snprintf(buf, sizeof(buf), "[%u,%u,%u,%u,%u]", e.hour, e.minute, e.daysMask, e.enabled ? 1 : 0, e.durationSeconds);
         j += buf;
     }
     j += "],\"holidays\":[";
@@ -108,6 +109,51 @@ void WebDashboard::handleState() {
 // ------------------------------------------------------------------
 // Les POST envoient la liste COMPLÈTE dans l'argument "data" (CSV).
 // ------------------------------------------------------------------
+// Un seul POST applique les trois catégories après validation complète.
+void WebDashboard::handleSettings() {
+    if (!_server.hasArg("sched") || !_server.hasArg("hol") || !_server.hasArg("ext")) {
+        sendError("fields"); return;
+    }
+    String schedData = _server.arg("sched");
+    String holData = _server.arg("hol");
+    String extData = _server.arg("ext");
+    static ScheduleEntry schedules[ScheduleManager::MAX_SCHEDULES];
+    static ExceptionDate holidays[ExceptionCalendar::MAX_EXCEPTIONS];
+    static ExtraDay extras[ExtraDays::MAX_EXTRAS];
+    uint8_t ns = 0; uint16_t nh = 0, ne = 0;
+    int start = 0;
+    while (start < (int)schedData.length()) {
+        if (ns >= ScheduleManager::MAX_SCHEDULES) { sendError("sched_limit"); return; }
+        int end = schedData.indexOf(',', start); if (end < 0) end = schedData.length();
+        String tok = schedData.substring(start, end); start = end + 1;
+        int h, m, mask, en, duration;
+        if (sscanf(tok.c_str(), "%d:%d:%d:%d:%d", &h, &m, &mask, &en, &duration) != 5 || h < 0 || h > 23 || m < 0 || m > 59 || mask < 0 || mask > 127 || (en != 0 && en != 1) || duration < 1 || duration > 60) { sendError("sched_format"); return; }
+        schedules[ns++] = { (uint8_t)h, (uint8_t)m, (uint8_t)mask, en != 0, (uint8_t)duration };
+    }
+    start = 0;
+    while (start < (int)holData.length()) {
+        if (nh >= ExceptionCalendar::MAX_EXCEPTIONS) { sendError("hol_limit"); return; }
+        int end = holData.indexOf(',', start); if (end < 0) end = holData.length();
+        String tok = holData.substring(start, end); start = end + 1;
+        int y, mo, d;
+        if (sscanf(tok.c_str(), "%d-%d-%d", &y, &mo, &d) != 3 || y < 2024 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) { sendError("hol_format"); return; }
+        holidays[nh++] = { (uint16_t)y, (uint8_t)mo, (uint8_t)d };
+    }
+    start = 0;
+    while (start < (int)extData.length()) {
+        if (ne >= ExtraDays::MAX_EXTRAS) { sendError("ext_limit"); return; }
+        int end = extData.indexOf(',', start); if (end < 0) end = extData.length();
+        String tok = extData.substring(start, end); start = end + 1;
+        int y, mo, d, tpl;
+        if (sscanf(tok.c_str(), "%d-%d-%d:%d", &y, &mo, &d, &tpl) != 4 || y < 2024 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31 || tpl < 0 || tpl > 6) { sendError("ext_format"); return; }
+        extras[ne++] = { (uint16_t)y, (uint8_t)mo, (uint8_t)d, (uint8_t)tpl };
+    }
+    _sched.replaceAll(schedules, ns);
+    _holidays.replaceAll(holidays, nh);
+    _extras.replaceAll(extras, ne);
+    sendOk();
+}
+
 void WebDashboard::handleSchedules() {
     if (!_server.hasArg("data")) { sendError("data"); return; }
     String data = _server.arg("data");
@@ -122,10 +168,12 @@ void WebDashboard::handleSchedules() {
         start = end + 1;
         if (tok.length() == 0) continue;
 
-        int h, m, mask, en;
-        if (sscanf(tok.c_str(), "%d:%d:%d:%d", &h, &m, &mask, &en) != 4) { sendError("format"); return; }
-        if (h < 0 || h > 23 || m < 0 || m > 59 || mask < 0 || mask > 127) { sendError("range"); return; }
-        list[n++] = { (uint8_t)h, (uint8_t)m, (uint8_t)mask, en != 0 };
+        int h, m, mask, en, duration = 2;
+        int fields = sscanf(tok.c_str(), "%d:%d:%d:%d:%d", &h, &m, &mask, &en, &duration);
+        if (fields == 4) duration = 2;
+        else if (fields != 5) { sendError("format"); return; }
+        if (h < 0 || h > 23 || m < 0 || m > 59 || mask < 0 || mask > 127 || (en != 0 && en != 1) || duration < 1 || duration > 60) { sendError("range"); return; }
+        list[n++] = { (uint8_t)h, (uint8_t)m, (uint8_t)mask, en != 0, (uint8_t)duration };
     }
     _sched.replaceAll(list, n);
     sendOk();

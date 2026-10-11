@@ -10,10 +10,9 @@ public:
     // A appeler dans setup() : relais au repos immédiatement.
     void begin();
 
-    // Sonnerie programmée : plusieurs impulsions courtes. BLOQUANT (~2 s) :
-    // volontaire, une navigation ne doit pas interrompre une sonnerie en cours.
+    // Sonnerie programmée : activation continue et non bloquante.
     // Ignorée si une sonnerie "maintenue" est active.
-    void ringNow(uint8_t pulseCount, uint16_t pulseOnMs, uint16_t pulseOffMs);
+    void ringFor(uint32_t durationMs);
 
     // Sonnerie "maintenue" (bouton OLED ou bouton web) :
     // le relais reste fermé tant que feedHold() est appelée régulièrement.
@@ -30,6 +29,9 @@ private:
     uint8_t _pin;
     bool _activeLow;
     bool _held = false;
+    bool _timedRinging = false;
+    unsigned long _ringStarted = 0;
+    uint32_t _ringDurationMs = 0;
     unsigned long _heldSince = 0;
     unsigned long _lastFeed = 0;
     void setRelay(bool on);

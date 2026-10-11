@@ -12,6 +12,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0}
 body{font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+body{padding-bottom:calc(172px + env(safe-area-inset-bottom))}
 button{font:inherit;color:inherit;cursor:pointer}
 header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top));background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.25)}
 .logo{width:50px;height:50px;border-radius:50%;background:#fff;padding:2px;flex:none}
@@ -58,11 +59,13 @@ main{max-width:980px;margin:0 auto;padding:18px}
 .btn.sec{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
 @media(prefers-color-scheme:dark){.btn.sec{color:#fff;border-color:#4a6aa0}.btn{background:#1d5cae}}
 .btn.add{width:100%;margin-top:12px;background:var(--orange)}
-.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px 12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;margin-bottom:10px;background:var(--card);transition:opacity .2s}
+.row{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:10px 12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;margin-bottom:10px;background:var(--card);transition:opacity .2s}
+.duration{display:flex;align-items:center;gap:4px;color:var(--mut);font-size:13px}.duration input{width:64px;font:600 17px system-ui;border:1.5px solid var(--line);border-radius:10px;padding:7px 5px;background:var(--bg);color:var(--ink);text-align:center}
 .row.off{opacity:.55}
 .row input[type=time]{font:600 20px system-ui;border:1.5px solid var(--line);border-radius:10px;padding:6px 8px;background:var(--bg);color:var(--ink)}
+@media(max-width:400px){.row{gap:8px 5px;padding:8px}.row input[type=time]{width:100px;font-size:17px}.duration input{width:48px;padding:6px 2px;font-size:15px}}
 .pills{grid-column:1/-1;display:flex;gap:6px;justify-content:space-between}
-@media(min-width:640px){.row{grid-template-columns:auto 1fr auto auto}.pills{grid-column:2;justify-content:flex-start}}
+@media(min-width:640px){.row{grid-template-columns:auto auto 1fr auto auto}.pills{grid-column:2/-1;justify-content:flex-start}}
 .pill{flex:1;max-width:44px;height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);font-weight:600;font-size:14px;color:var(--mut);transition:all .15s}
 .pill.on{background:var(--navy);border-color:var(--navy);color:#fff}
 @media(prefers-color-scheme:dark){.pill.on{background:#1d5cae;border-color:#1d5cae}}
@@ -115,6 +118,8 @@ nav.bar button.on{color:var(--navy);background:rgba(0,43,84,.08)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.err{background:var(--red)}
 footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
+.savebar{display:none;position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:29;max-width:700px;margin:auto;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--sh);align-items:center;gap:10px}
+.savebar.show{display:flex}.savebar span{flex:1;font-size:13px;color:var(--mut)}.savebar .btn{padding:9px 12px;white-space:nowrap}.savebar .sec{padding:8px 10px}
 </style>
 </head>
 <body>
@@ -194,6 +199,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
   <footer>Divine Grace College of Arts, Science and Technology · Garoua</footer>
 </main>
 
+<div class="savebar" id="savebar"><span id="pendingText"></span><button class="btn sec" id="discardBtn" data-i="discard"></button><button class="btn" id="applyBtn" data-i="apply"></button></div>
+
 <nav class="bar" id="nav">
   <button data-t="home" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-i="navHome"></span></button>
   <button data-t="sched"><svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg><span data-i="navSched"></span></button>
@@ -218,7 +225,7 @@ schedTitle:"Horaires de sonnerie",schedSub:"Choisissez les heures et les jours c
 calTitle:"Calendrier",mH:"Jour férié",mR:"Période",mE:"Exceptionnel",
 hintH:"Touchez les jours sans sonnerie (jours fériés).",hintR:"Touchez le premier puis le dernier jour de la période (vacances).",hintE:"Touchez un jour où la sonnerie doit fonctionner exceptionnellement (ex. un samedi de rattrapage).",
 rangeStart:"Début de période choisi : touchez le dernier jour.",useSched:"Appliquer l'horaire du",legHol:"Férié / vacances",legExt:"Sonnerie exceptionnelle",legToday:"Aujourd'hui",
-listHol:"Jours fériés et vacances",listExt:"Jours exceptionnels",noneList:"Aucun",fixed:"Ajouter les fériés fixes de",fixedDone:"Fériés ajoutés",
+listHol:"Jours fériés et vacances",listExt:"Jours exceptionnels",noneList:"Aucun",fixed:"Ajouter les fériés fixes de",fixedDone:"Fériés ajoutés",duration:"Durée (secondes)",apply:"Valider les changements",discard:"Annuler",pending:"Modifications en attente",confirmApply:"Confirmer l’application de ces réglages ? Les horaires seront enregistrés sur l’appareil.",confirmDiscard:"Annuler toutes les modifications en attente ?",
 saved:"Enregistré ✓",error:"Erreur de communication",timeTitle:"Heure de l'appareil",timeDesc:"Utilisée pour déclencher les sonneries automatiques.",devTime:"Heure actuelle",timeState:"État",trusted:"Fiable",notTrusted:"Non fiable",timeSet:"Heure synchronisée",
 connTitle:"Connexion",addr:"Adresse",mdns:"Nom local",device:"Appareil",limit:"Limite atteinte"},
 en:{school:"Divine Grace College of Arts, Science and Technology",navHome:"Home",navSched:"Schedule",navCal:"Calendar",navSet:"Settings",
@@ -230,14 +237,14 @@ schedTitle:"Bell schedule",schedSub:"Pick the times and the days they apply to (
 calTitle:"Calendar",mH:"Holiday",mR:"Period",mE:"Exceptional",
 hintH:"Tap the days without bell (public holidays).",hintR:"Tap the first then the last day of the period (vacation).",hintE:"Tap a day when the bell must exceptionally ring (e.g. a make-up Saturday).",
 rangeStart:"Period start set: tap the last day.",useSched:"Use the schedule of",legHol:"Holiday / vacation",legExt:"Exceptional bell",legToday:"Today",
-listHol:"Holidays and vacations",listExt:"Exceptional days",noneList:"None",fixed:"Add fixed holidays for",fixedDone:"Holidays added",
+listHol:"Holidays and vacations",listExt:"Exceptional days",noneList:"None",fixed:"Add fixed holidays for",fixedDone:"Holidays added",duration:"Duration (seconds)",apply:"Apply changes",discard:"Discard",pending:"Changes pending",confirmApply:"Confirm these settings? The schedule will be saved on the device.",confirmDiscard:"Discard all pending changes?",
 saved:"Saved ✓",error:"Communication error",timeTitle:"Device time",timeDesc:"Used to trigger the automatic bells.",devTime:"Current time",timeState:"Status",trusted:"Reliable",notTrusted:"Not reliable",timeSet:"Time synchronised",
 connTitle:"Connection",addr:"Address",mdns:"Local name",device:"Device",limit:"Limit reached"}};
 const MON={fr:["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"],en:["January","February","March","April","May","June","July","August","September","October","November","December"]};
 const DAY={fr:["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"],en:["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]};
 const ORDER=[1,2,3,4,5,6,0];
 let lang="fr";const t=k=>T[lang][k]||k;
-const S={base:Date.now(),t0:performance.now(),trusted:true,ip:"",sched:[],hol:new Set(),ext:new Map(),loaded:false};
+const S={base:Date.now(),t0:performance.now(),trusted:true,ip:"",sched:[],hol:new Set(),ext:new Map(),loaded:false,savedSignature:"",saving:false};
 const devNow=()=>new Date(S.base+(performance.now()-S.t0));
 const key=d=>d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
 const keyDate=k=>{const[a,b,c]=k.split("-").map(Number);return new Date(Date.UTC(a,b-1,c))};
@@ -250,14 +257,19 @@ async function api(path,body){
 }
 let toastT;
 function toast(m,err){const e=$("#toast");e.textContent=m;e.className="show"+(err?" err":"");clearTimeout(toastT);toastT=setTimeout(()=>e.className="",2200)}
-async function post(path,data){try{await api(path,"data="+encodeURIComponent(data));toast(t("saved"))}catch(e){toast(t("error"),1)}}
-const timers={};const debounce=(k,f,ms=450)=>{clearTimeout(timers[k]);timers[k]=setTimeout(f,ms)};
+function signature(){return JSON.stringify([S.sched.map(s=>[s.h,s.m,s.mask,s.en,s.duration]),[...S.hol].sort(),[...S.ext].sort()])}
+function updatePending(){const dirty=S.loaded&&signature()!==S.savedSignature;$("#savebar").classList.toggle("show",dirty);$("#pendingText").textContent=dirty?t("pending"):"";$("#applyBtn").disabled=S.saving}
+function saveSched(){updatePending()}
+function saveHol(){prune();updatePending()}
+function saveExt(){prune();updatePending()}
+async function applySettings(){if(S.saving||!confirm(t("confirmApply")))return;S.saving=true;updatePending();
+  const sched=S.sched.map(s=>s.h+":"+s.m+":"+s.mask+":"+(s.en?1:0)+":"+s.duration).join(",");
+  const hol=[...S.hol].sort().join(","),ext=[...S.ext].sort().map(([k,v])=>k+":"+v).join(",");
+  try{await api("/api/settings","sched="+encodeURIComponent(sched)+"&hol="+encodeURIComponent(hol)+"&ext="+encodeURIComponent(ext));S.savedSignature=signature();toast(t("saved"))}
+  catch(e){toast(t("error"),1)}finally{S.saving=false;updatePending()}}
+function discardSettings(){if(!confirm(t("confirmDiscard")))return;load(true)}
 function prune(){const lim=new Date(devNow().getTime()-30*864e5);const lk=key(lim);
   for(const k of [...S.hol])if(k<lk)S.hol.delete(k);for(const k of [...S.ext.keys()])if(k<lk)S.ext.delete(k)}
-const saveSched=()=>debounce("s",()=>post("/api/schedules",S.sched.map(s=>s.h+":"+s.m+":"+s.mask+":"+(s.en?1:0)).join(",")));
-const saveHol=()=>{prune();debounce("h",()=>post("/api/holidays",[...S.hol].sort().join(",")),250)};
-const saveExt=()=>{prune();debounce("e",()=>post("/api/extras",[...S.ext].sort().map(([k,v])=>k+":"+v).join(",")),250)};
-
 async function load(full){
   try{
     const d=await api("/api/state");
@@ -265,13 +277,15 @@ async function load(full){
     S.base=Date.UTC(Y,M-1,D,h,mi,s);S.t0=performance.now();S.trusted=d.trusted;S.ip=d.ip;
     if(d.lang!==lang){lang=d.lang;applyLang()}
     if(full||!S.loaded){
-      S.sched=d.sched.map(a=>({h:a[0],m:a[1],mask:a[2],en:!!a[3]}));S.hol=new Set(d.holidays);S.ext=new Map(d.extras);S.loaded=true;
+      S.sched=d.sched.map(a=>({h:a[0],m:a[1],mask:a[2],en:!!a[3],duration:a[4]||2}));S.hol=new Set(d.holidays);S.ext=new Map(d.extras);S.loaded=true;
+      S.savedSignature=signature();updatePending();
       if(!cal.y){const n=devNow();cal.y=n.getUTCFullYear();cal.m=n.getUTCMonth()}
       renderSched();renderCal();
     }
     online(true);renderHome();
   }catch(e){online(false)}
 }
+$("#applyBtn").onclick=applySettings;$("#discardBtn").onclick=discardSettings;
 function online(ok){$("#conn").className="chip"+(ok?" ok":"");$("#connTxt").textContent=ok?t("online"):t("offline")}
 
 /* ---------- i18n ---------- */
@@ -332,15 +346,16 @@ function renderSched(){
   if(!S.sched.length)box.innerHTML=`<p class="empty">${t("noSched")}</p>`;
   S.sched.forEach((s,i)=>{
     const row=document.createElement("div");row.className="row"+(s.en?"":" off");
-    row.innerHTML=`<input type="time" value="${pad(s.h)}:${pad(s.m)}"><span></span><label class="sw"><input type="checkbox" ${s.en?"checked":""}><i></i></label><button class="icon" title="${t("del")}">✕</button><div class="pills">${ORDER.map(d=>`<button class="pill${s.mask>>d&1?" on":""}" data-d="${d}" title="${DAY[lang][d]}">${DAY[lang][d][0].toUpperCase()}</button>`).join("")}</div>`;
+    row.innerHTML=`<input type="time" value="${pad(s.h)}:${pad(s.m)}"><label class="duration"><input type="number" class="durationInput" min="1" max="60" step="1" value="${s.duration}" aria-label="${t("duration")}" title="${t("duration")}"><span>s</span></label><span></span><label class="sw"><input type="checkbox" ${s.en?"checked":""}><i></i></label><button class="icon" title="${t("del")}">✕</button><div class="pills">${ORDER.map(d=>`<button class="pill${s.mask>>d&1?" on":""}" data-d="${d}" title="${DAY[lang][d]}">${DAY[lang][d][0].toUpperCase()}</button>`).join("")}</div>`;
     row.querySelector("input[type=time]").onchange=e=>{const v=e.target.value.split(":");if(v.length<2)return;s.h=+v[0];s.m=+v[1];S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
+    row.querySelector(".durationInput").onchange=e=>{s.duration=Math.max(1,Math.min(60,parseInt(e.target.value,10)||2));e.target.value=s.duration;saveSched()};
     row.querySelector(".sw input").onchange=e=>{s.en=e.target.checked;row.classList.toggle("off",!s.en);saveSched();renderHome()};
     row.querySelector(".icon").onclick=()=>{S.sched.splice(i,1);saveSched();renderSched();renderHome()};
     row.querySelectorAll(".pill").forEach(p=>p.onclick=()=>{s.mask^=1<<+p.dataset.d;p.classList.toggle("on");saveSched();renderHome()});
     box.appendChild(row);
   });
 }
-$("#addSched").onclick=()=>{if(S.sched.length>=20)return toast(t("limit"),1);S.sched.push({h:7,m:30,mask:62,en:true});S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
+$("#addSched").onclick=()=>{if(S.sched.length>=20)return toast(t("limit"),1);S.sched.push({h:7,m:30,mask:62,en:true,duration:2});S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
 
 /* ---------- calendrier ---------- */
 const cal={y:0,m:0};let mode="h",rangeA=null;
@@ -371,7 +386,7 @@ function renderCal(){
 }
 function tapDay(k){
   if(mode==="h"){if(S.hol.has(k))S.hol.delete(k);else{if(S.hol.size>=200)return toast(t("limit"),1);S.hol.add(k);S.ext.delete(k)}saveHol();saveExt()}
-  else if(mode==="e"){if(S.ext.has(k))S.ext.delete(k);else{S.ext.set(k,+$("#tplSel").value);S.hol.delete(k)}saveExt();saveHol()}
+  else if(mode==="e"){if(S.ext.has(k))S.ext.delete(k);else{if(S.ext.size>=60)return toast(t("limit"),1);S.ext.set(k,+$("#tplSel").value);S.hol.delete(k)}saveExt();saveHol()}
   else{
     if(!rangeA){rangeA=k;toast(t("rangeStart"))}
     else{let a=keyDate(rangeA),b=keyDate(k);if(a>b)[a,b]=[b,a];

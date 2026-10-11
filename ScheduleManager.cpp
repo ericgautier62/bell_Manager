@@ -3,23 +3,42 @@
 #include "config.h"
 
 void ScheduleManager::begin() {
+    struct LegacyScheduleEntry { uint8_t hour, minute, daysMask; bool enabled; };
+    static LegacyScheduleEntry legacy[MAX_SCHEDULES];
     Preferences prefs;
     prefs.begin("bell_sched", false);
-    size_t bytes = prefs.getBytes("entries", _entries, sizeof(_entries));
-    _count = bytes / sizeof(ScheduleEntry);
+    uint8_t version = prefs.getUChar("ver", 0);
+    size_t bytes = prefs.getBytesLength("entries");
+    bool migrated = false;
+    if (version >= 2) {
+        size_t read = prefs.getBytes("entries", _entries, sizeof(_entries));
+        _count = read / sizeof(ScheduleEntry);
+        if (_count > MAX_SCHEDULES) _count = MAX_SCHEDULES;
+    } else if (bytes > 0) {
+        size_t read = prefs.getBytes("entries", legacy, sizeof(legacy));
+        _count = read / sizeof(LegacyScheduleEntry);
+        if (_count > MAX_SCHEDULES) _count = MAX_SCHEDULES;
+        for (uint8_t i = 0; i < _count; i++) {
+            _entries[i] = { legacy[i].hour, legacy[i].minute, legacy[i].daysMask, legacy[i].enabled, 2 };
+        }
+        migrated = true;
+    } else {
+        _count = 0;
+    }
     bool firstBoot = !prefs.getBool("init", false);   // vrai seulement au tout premier démarrage
     prefs.end();
 
     if (firstBoot) {
         loadDefaults();
         save();
-    }
+    } else if (migrated || version < 2) save();
 }
 
 void ScheduleManager::save() {
     Preferences prefs;
     prefs.begin("bell_sched", false);
     prefs.putBool("init", true);
+    prefs.putUChar("ver", 2);
     if (_count == 0) prefs.remove("entries");   // putBytes(len=0) ne ferait rien
     else prefs.putBytes("entries", _entries, _count * sizeof(ScheduleEntry));
     prefs.end();
@@ -29,9 +48,9 @@ void ScheduleManager::loadDefaults() {
     // Exemple lundi à vendredi (bits 1..5 ; 0=dimanche ... 6=samedi). A adapter via l'interface web.
     const uint8_t JOURS_OUVRES = 0b0111110;
     _count = 0;
-    _entries[_count++] = {7, 30, JOURS_OUVRES, true};
-    _entries[_count++] = {12, 0, JOURS_OUVRES, true};
-    _entries[_count++] = {17, 0, JOURS_OUVRES, true};
+    _entries[_count++] = {7, 30, JOURS_OUVRES, true, 2};
+    _entries[_count++] = {12, 0, JOURS_OUVRES, true, 2};
+    _entries[_count++] = {17, 0, JOURS_OUVRES, true, 2};
 }
 
 void ScheduleManager::replaceAll(const ScheduleEntry* list, uint8_t n) {
@@ -69,7 +88,7 @@ void ScheduleManager::update(RtcManager& rtc, ExceptionCalendar& holidays, Extra
         const ScheduleEntry& e = _entries[i];
         if (!e.enabled) continue;
         if (e.hour == now.hour() && e.minute == now.minute() && (e.daysMask & (1 << effectiveDow))) {
-            relay.ringNow(BELL_PULSE_COUNT, BELL_PULSE_ON_MS, BELL_PULSE_OFF_MS);
+            relay.ringFor((uint32_t)e.durationSeconds * 1000UL);
             break;
         }
     }
