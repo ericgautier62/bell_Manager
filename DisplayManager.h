@@ -18,6 +18,7 @@ class DisplayManager {
 public:
     DisplayManager(U8G2& u8g2);
     void begin();
+    void setPowerSave(bool enabled);
     void displayMenu(const Menu& menu);
     void displayMessage(const char* msg);
     void displayMessage(const char* line1, const char* line2);

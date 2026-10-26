@@ -37,6 +37,7 @@ private:
     // --- Etat partagé avec l'ISR ---
     volatile int _counter;
     volatile uint8_t _lastState;   // 2 bits: (CLK<<1)|DT précédents
+    volatile int8_t _quarterSteps; // transitions accumulées avant un cran complet
     portMUX_TYPE _mux;
 
     // --- Debounce bouton non bloquant (remplace le delay() bloquant) ---

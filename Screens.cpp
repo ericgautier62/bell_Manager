@@ -260,16 +260,17 @@ void Screens::portalFlow() {
         return;
     }
 
-    bool connected = false;
+    bool connected = false, connectionFailed = false, cancelled = false;
     unsigned long lastDraw = 0;
 
     while (true) {
         pump();
-        _net.processPortal();
+        if (_net.processPortal()) { connected = true; break; }
+        uint8_t wifiStatus = _net.portalConnectionStatus();
+        if (wifiStatus != WL_IDLE_STATUS && wifiStatus != WL_CONNECTED) connectionFailed = true;
 
-        if (_net.portalElapsedMs() > 1500 && WiFi.status() == WL_CONNECTED) { connected = true; break; }
         if (!_net.portalActive()) break;                                   // délai expiré
-        if (_enc.isButtonPressed()) { _enc.clearButtonEvent(); break; }    // annulé
+        if (_enc.isButtonPressed()) { _enc.clearButtonEvent(); cancelled = true; break; } // annulé
 
         if (millis() - lastDraw >= 250) {
             lastDraw = millis();
@@ -281,11 +282,19 @@ void Screens::portalFlow() {
             u.firstPage();
             do {
                 u.setFont(u8g2_font_6x10_tf);
-                text(u, 0, 0, I18n::tr("Rejoins le Wi-Fi :", "Join the Wi-Fi:"));
-                text(u, 0, 11, AP_NAME);
-                text(u, 0, 24, I18n::tr("puis ouvre :", "then open:"));
-                text(u, 0, 35, "192.168.4.1");
-                text(u, 0, 52, foot);
+                if (connectionFailed) {
+                    text(u, 0, 0, I18n::tr("Connexion échouée", "Connection failed"));
+                    text(u, 0, 13, I18n::tr("Vérifie le mot de passe", "Check the password"));
+                    text(u, 0, 26, I18n::tr("et réessaie sur le portail", "then retry in the portal"));
+                    text(u, 0, 39, "192.168.4.1");
+                    text(u, 0, 52, foot);
+                } else {
+                    text(u, 0, 0, I18n::tr("Rejoins le Wi-Fi :", "Join the Wi-Fi:"));
+                    text(u, 0, 11, AP_NAME);
+                    text(u, 0, 24, I18n::tr("puis ouvre :", "then open:"));
+                    text(u, 0, 35, "192.168.4.1");
+                    text(u, 0, 52, foot);
+                }
             } while (u.nextPage());
         }
         delay(10);
@@ -302,7 +311,9 @@ void Screens::portalFlow() {
         toast(I18n::tr("Wi-Fi enregistré", "Wi-Fi saved"), I18n::tr("Connexion OK", "Connected"), 1200);
         wifiInfo();
     } else {
-        toast(I18n::tr("Configuration", "Setup"), I18n::tr("annulée", "cancelled"), 1200);
+        if (connectionFailed) toast(I18n::tr("Échec de connexion", "Connection failed"), I18n::tr("Vérifie le réseau/mot de passe", "Check network/password"), 2200);
+        else if (cancelled) toast(I18n::tr("Configuration", "Setup"), I18n::tr("annulée", "cancelled"), 1200);
+        else toast(I18n::tr("Délai du portail écoulé", "Portal timed out"), I18n::tr("Relance Connexion > Wi-Fi", "Retry Connection > Wi-Fi"), 2200);
     }
 }
 

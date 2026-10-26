@@ -7,7 +7,7 @@
     - WiFiManager     (tzapu)
   Intégrées à l'ESP32 (rien à installer) : WebServer, ESPmDNS, Preferences.
 */
-
+//fvgvhbzgzt
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <WiFi.h>
@@ -24,6 +24,7 @@
 #include "ScheduleManager.h"
 #include "WebDashboard.h"
 #include "NetworkManager.h"
+#include "BleManager.h"
 #include "Screens.h"
 
 // Mode "F" (full frame buffer) : animations fluides, ~1 Ko de RAM.
@@ -47,16 +48,66 @@ bool timeTrusted = false;
 
 WebDashboard web(rtc, schedules, holidays, extras, relay, timeTrusted);
 NetworkManager net(web, rtc, timeTrusted);
+BleManager ble(web);
 
 // Tâche de fond : appelée en continu, y compris pendant les animations de veille
 // et à l'intérieur des écrans dédiés.
 void backgroundService() {
     relay.update();       // coupe la sonnerie maintenue si le heartbeat s'arrête
     net.service();        // Wi-Fi, serveur web, synchro NTP
+    ble.service();        // transport BLE utilisé par l'application Android
     if (timeTrusted) schedules.update(rtc, holidays, extras, relay);
 }
 
 Screens screens(display, encoder, relay, rtc, net, timeTrusted, backgroundService);
+
+// Mode nuit base sur l'heure locale du RTC. Le processeur reste actif pour
+// assurer les horaires et le serveur web; seul l'écran et le Wi-Fi économisent.
+static bool nightModeInitialized = false;
+static bool nightModeActive = false;
+static unsigned long screenAwakeUntilMs = 0;
+
+void updateNightMode() {
+    if (!timeTrusted) {
+        // Sans heure fiable, ne jamais risquer de couper l'affichage/Wi-Fi
+        // selon une heure erronée.
+        if (nightModeInitialized && nightModeActive) {
+            nightModeActive = false;
+            display.setPowerSave(false);
+            WiFi.setSleep(false);
+        }
+        nightModeInitialized = false;
+        screenAwakeUntilMs = 0;
+        return;
+    }
+
+    DateTime now = rtc.now();
+    bool shouldBeNight = now.hour() >= NIGHT_MODE_START_HOUR ||
+                         now.hour() < NIGHT_MODE_END_HOUR;
+
+    if (!nightModeInitialized || shouldBeNight != nightModeActive) {
+        nightModeInitialized = true;
+        nightModeActive = shouldBeNight;
+        screenAwakeUntilMs = 0;
+        display.setPowerSave(nightModeActive);
+        WiFi.setSleep(nightModeActive);
+        Serial.printf("[Mode nuit] %s a %02u:%02u\n",
+                      nightModeActive ? "actif" : "termine",
+                      (unsigned)now.hour(), (unsigned)now.minute());
+    }
+
+    if (!nightModeActive) return;
+
+    // Le rotary ou son bouton rallume temporairement l'OLED la nuit.
+    if (encoder.hasPendingActivity()) {
+        screenAwakeUntilMs = millis() + NIGHT_MODE_SCREEN_WAKE_MS;
+        display.setPowerSave(false);
+    } else if (screenAwakeUntilMs != 0 &&
+               (int32_t)(millis() - screenAwakeUntilMs) >= 0) {
+        screenAwakeUntilMs = 0;
+        display.setPowerSave(true);
+    }
+}
 
 // Heure fournie à l'animation d'horloge de veille
 ClockInfo clockProvider() {
@@ -80,7 +131,10 @@ Menu subMenuLangue("Langue", "Language");
 
 // --- Actions (fonctions simples : MenuItem n'accepte que des pointeurs de fonction) ---
 void actWifi()      { screens.wifi(); }
-void actBluetooth() { screens.toast(I18n::tr("Bluetooth", "Bluetooth"), I18n::tr("Bientôt disponible", "Coming soon")); }
+void actBluetooth() {
+    ble.openPairingWindow();
+    screens.toast(I18n::tr("Bluetooth actif", "Bluetooth active"), I18n::tr("5 min - ouvrez l'app", "5 min - open the app"), 2500);
+}
 void actRingNow()   { screens.ringNow(); }
 void actStatus()    { screens.status(); }
 void actWebInfo()   { screens.webInfo(); }
@@ -156,6 +210,7 @@ void setup() {
 
 void loop() {
     encoder.update();
+    updateNightMode();
     menuManager.update();     // appelle aussi backgroundService()
     delay(DISPLAY_REFRESH_MS);
 }

@@ -11,7 +11,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#002B54">
 <title>DGCAST · Sonnerie</title>
-<link rel="icon" href="/logo.png">
+<link rel="icon" href="logo.png">
 <style>
 :root{--navy:#002B54;--navy2:#0b4a8a;--orange:#DF8933;--bg:#F2F5FA;--card:#fff;--ink:#14213a;--mut:#667290;--line:#e3e8f2;--red:#d64550;--green:#1f9d6b;--sh:0 8px 28px rgba(0,43,84,.09)}
 @media (prefers-color-scheme:dark){:root{--bg:#0a1120;--card:#121b2d;--ink:#e8eefb;--mut:#93a0bd;--line:#223049;--sh:0 8px 28px rgba(0,0,0,.4)}}
@@ -126,12 +126,19 @@ nav.bar button.on{color:var(--navy);background:rgba(0,43,84,.08)}
 footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
 .savebar{display:none;position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:29;max-width:700px;margin:auto;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--sh);align-items:center;gap:10px}
 .savebar.show{display:flex}.savebar span{flex:1;font-size:13px;color:var(--mut)}.savebar .btn{padding:9px 12px;white-space:nowrap}.savebar .sec{padding:8px 10px}
+.exc-dialog{width:min(560px,calc(100% - 24px));max-height:88vh;overflow:auto;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);padding:20px;box-shadow:var(--sh)}
+.exc-dialog::backdrop{background:rgba(5,15,35,.58)}
+.exc-dialog h2{margin:0 0 4px}.exc-dialog label{display:grid;gap:5px;color:var(--mut);font-size:13px;margin:12px 0}
+.exc-dialog input,.exc-dialog select{width:100%;min-height:42px}
+.exc-bells .row{grid-template-columns:1fr auto auto}.exc-bells .row input[type=time]{width:100%;font-size:17px}
+.exc-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 </style>
 </head>
 <body>
 <header class="top">
   <img class="logo" src="/logo.png" alt="DGCAST">
   <div class="brand"><b>DGCAST · Garoua</b><span data-i="school"></span></div>
+  <button class="btn" id="bleConnect" style="display:none;padding:8px 10px;font-size:12px">Bluetooth</button>
   <div class="chip" id="conn"><i></i><span id="connTxt">…</span></div>
 </header>
 
@@ -175,7 +182,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
         <button data-m="e" data-i="mE"></button>
       </div>
       <p class="sub" id="modeHint"></p>
-      <div class="tpl" id="tpl"><span data-i="useSched"></span><select id="tplSel"></select></div>
+      <p class="hint" id="tplHint"></p>
+      <select id="tplSel" style="display:none"></select>
       <div class="calhead"><button id="prev" aria-label="prev">‹</button><b id="monthT"></b><button id="next" aria-label="next">›</button></div>
       <div class="cal" id="cal"></div>
       <div class="legend"><span class="l1" data-i="legHol"></span><span class="l2" data-i="legExt"></span><span class="l3" data-i="legToday"></span></div>
@@ -205,6 +213,18 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:22px}
   <footer>Divine Grace College of Arts, Science and Technology · Garoua</footer>
 </main>
 
+<dialog class="exc-dialog" id="excDialog">
+  <form id="excForm">
+    <h2 data-i="excTitle"></h2><p class="sub" id="excDate"></p>
+    <label><span data-i="repeat"></span><select id="excRepeat"><option value="0" data-i="repeatNone"></option><option value="1" data-i="repeatDaily"></option><option value="7" data-i="repeatWeekly"></option></select></label>
+    <p class="hint" id="excRepeatHint"></p>
+    <label id="excEndWrap"><span data-i="repeatUntil"></span><input type="date" id="excEnd"></label>
+    <h3 data-i="excBells"></h3><div class="exc-bells" id="excBellsList"></div>
+    <button class="btn sec" type="button" id="addExcBell" data-i="addBell"></button>
+    <div class="exc-actions"><button class="btn sec" type="button" id="cancelExc" data-i="discard"></button><button class="btn" type="submit" data-i="excSave"></button></div>
+  </form>
+</dialog>
+
 <div class="savebar" id="savebar"><span id="pendingText"></span><button class="btn sec" id="discardBtn" data-i="discard"></button><button class="btn" id="applyBtn" data-i="apply"></button></div>
 
 <nav class="bar" id="nav">
@@ -230,8 +250,9 @@ untrusted:"L'heure n'est pas fiable : les sonneries automatiques sont suspendues
 schedTitle:"Horaires de sonnerie",schedSub:"Choisissez les heures et les jours concernés (par défaut du lundi au vendredi).",add:"+ Ajouter une sonnerie",noSched:"Aucune sonnerie programmée.",del:"Supprimer",
 calTitle:"Calendrier",mH:"Jour férié",mR:"Période",mE:"Exceptionnel",
 hintH:"Touchez les jours sans sonnerie (jours fériés).",hintR:"Touchez le premier puis le dernier jour de la période (vacances).",hintE:"Touchez un jour où la sonnerie doit fonctionner exceptionnellement (ex. un samedi de rattrapage).",
-rangeStart:"Début de période choisi : touchez le dernier jour.",useSched:"Appliquer l'horaire du",legHol:"Férié / vacances",legExt:"Sonnerie exceptionnelle",legToday:"Aujourd'hui",
+rangeStart:"Début de période choisi : touchez le dernier jour.",useSched:"",legHol:"Férié / vacances",legExt:"Sonnerie exceptionnelle",legToday:"Aujourd'hui",
 listHol:"Jours fériés et vacances",listExt:"Jours exceptionnels",noneList:"Aucun",fixed:"Ajouter les fériés fixes de",fixedDone:"Fériés ajoutés",duration:"Durée (secondes)",apply:"Valider les changements",discard:"Annuler",pending:"Modifications en attente",confirmApply:"Confirmer l’application de ces réglages ? Les horaires seront enregistrés sur l’appareil.",confirmDiscard:"Annuler toutes les modifications en attente ?",
+hintE:"Touchez une date pour définir ses sonneries, leurs durées et une éventuelle répétition.",excTitle:"Sonneries exceptionnelles",repeat:"Répétition",repeatNone:"Une seule fois",repeatDaily:"Tous les jours",repeatWeekly:"Chaque semaine",repeatUntil:"Répéter jusqu’au",excBells:"Horaires et durées",excSave:"Ajouter à la liste",addBell:"Ajouter une sonnerie",excEmpty:"Ajoutez au moins une sonnerie.",excDateRequired:"La date de fin doit être égale ou postérieure à la première date.",excRepeatLabel:"Répétition",
 saved:"Enregistré ✓",error:"Erreur de communication",timeTitle:"Heure de l'appareil",timeDesc:"Utilisée pour déclencher les sonneries automatiques.",devTime:"Heure actuelle",timeState:"État",trusted:"Fiable",notTrusted:"Non fiable",timeSet:"Heure synchronisée",
 connTitle:"Connexion",addr:"Adresse",mdns:"Nom local",device:"Appareil",limit:"Limite atteinte"},
 en:{school:"Divine Grace College of Arts, Science and Technology",navHome:"Home",navSched:"Schedule",navCal:"Calendar",navSet:"Settings",
@@ -242,8 +263,9 @@ untrusted:"The time is not reliable: automatic bells are suspended.",syncNow:"Sy
 schedTitle:"Bell schedule",schedSub:"Pick the times and the days they apply to (Monday to Friday by default).",add:"+ Add a bell",noSched:"No bell scheduled.",del:"Delete",
 calTitle:"Calendar",mH:"Holiday",mR:"Period",mE:"Exceptional",
 hintH:"Tap the days without bell (public holidays).",hintR:"Tap the first then the last day of the period (vacation).",hintE:"Tap a day when the bell must exceptionally ring (e.g. a make-up Saturday).",
-rangeStart:"Period start set: tap the last day.",useSched:"Use the schedule of",legHol:"Holiday / vacation",legExt:"Exceptional bell",legToday:"Today",
+rangeStart:"Period start set: tap the last day.",useSched:"",legHol:"Holiday / vacation",legExt:"Exceptional bell",legToday:"Today",
 listHol:"Holidays and vacations",listExt:"Exceptional days",noneList:"None",fixed:"Add fixed holidays for",fixedDone:"Holidays added",duration:"Duration (seconds)",apply:"Apply changes",discard:"Discard",pending:"Changes pending",confirmApply:"Confirm these settings? The schedule will be saved on the device.",confirmDiscard:"Discard all pending changes?",
+hintE:"Tap a date to set its bells, durations, and optional repetition.",excTitle:"Exceptional bells",repeat:"Repeat",repeatNone:"Once",repeatDaily:"Every day",repeatWeekly:"Every week",repeatUntil:"Repeat until",excBells:"Times and durations",excSave:"Add to list",addBell:"Add a bell",excEmpty:"Add at least one bell.",excDateRequired:"The end date must be on or after the first date.",excRepeatLabel:"Repeat",
 saved:"Saved ✓",error:"Communication error",timeTitle:"Device time",timeDesc:"Used to trigger the automatic bells.",devTime:"Current time",timeState:"Status",trusted:"Reliable",notTrusted:"Not reliable",timeSet:"Time synchronised",
 connTitle:"Connection",addr:"Address",mdns:"Local name",device:"Device",limit:"Limit reached"}};
 const MON={fr:["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"],en:["January","February","March","April","May","June","July","August","September","October","November","December"]};
@@ -258,24 +280,32 @@ const fmtLong=k=>{const d=keyDate(k);return DAY[lang][d.getUTCDay()].slice(0,3)+
 
 /* ---------- réseau ---------- */
 async function api(path,body){
+  if(window.KairosBle){
+    if(!KairosBle.isConnected())throw new Error("BLE disconnected");
+    const id=++bleRequestId;
+    return new Promise((resolve,reject)=>{bleRequests.set(id,{resolve,reject});KairosBle.request(String(id),body===undefined?"GET":"POST",path,body||"")});
+  }
   const o=body===undefined?{cache:"no-store"}:{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body};
   const r=await fetch(path,o);if(!r.ok)throw new Error(r.status);return r.json();
 }
+let bleRequestId=0;const bleRequests=new Map();
+window.onKairosBleResponse=(id,json)=>{const p=bleRequests.get(+id);if(!p)return;bleRequests.delete(+id);try{const r=JSON.parse(json);if(r.ok===false)p.reject(new Error(r.error||"BLE error"));else p.resolve(r)}catch(e){p.reject(e)}};
+window.onKairosBleState=connected=>{online(!!connected);if(connected)load(true)};
 let toastT;
 function toast(m,err){const e=$("#toast");e.textContent=m;e.className="show"+(err?" err":"");clearTimeout(toastT);toastT=setTimeout(()=>e.className="",2200)}
-function signature(){return JSON.stringify([S.sched.map(s=>[s.h,s.m,s.mask,s.en,s.duration]),[...S.hol].sort(),[...S.ext].sort()])}
+function signature(){return JSON.stringify([S.sched.map(s=>[s.h,s.m,s.mask,s.en,s.duration]),[...S.hol].sort(),[...S.ext].sort().map(([k,p])=>[k,p.end,p.repeat,p.legacyTpl,p.bells.map(b=>[b.h,b.m,b.duration])])])}
 function updatePending(){const dirty=S.loaded&&signature()!==S.savedSignature;$("#savebar").classList.toggle("show",dirty);$("#pendingText").textContent=dirty?t("pending"):"";$("#applyBtn").disabled=S.saving}
 function saveSched(){updatePending()}
 function saveHol(){prune();updatePending()}
 function saveExt(){prune();updatePending()}
 async function applySettings(){if(S.saving||!confirm(t("confirmApply")))return;S.saving=true;updatePending();
   const sched=S.sched.map(s=>s.h+":"+s.m+":"+s.mask+":"+(s.en?1:0)+":"+s.duration).join(",");
-  const hol=[...S.hol].sort().join(","),ext=[...S.ext].sort().map(([k,v])=>k+":"+v).join(",");
+  const hol=[...S.hol].sort().join(","),ext=[...S.ext].sort().map(([k,p])=>k+":"+p.end+":"+p.repeat+":"+(p.legacyTpl===undefined?255:p.legacyTpl)+":"+p.bells.map(b=>b.h+"-"+b.m+"-"+b.duration).join("/")).join(",");
   try{await api("/api/settings","sched="+encodeURIComponent(sched)+"&hol="+encodeURIComponent(hol)+"&ext="+encodeURIComponent(ext));S.savedSignature=signature();toast(t("saved"))}
   catch(e){toast(t("error"),1)}finally{S.saving=false;updatePending()}}
 function discardSettings(){if(!confirm(t("confirmDiscard")))return;load(true)}
 function prune(){const lim=new Date(devNow().getTime()-30*864e5);const lk=key(lim);
-  for(const k of [...S.hol])if(k<lk)S.hol.delete(k);for(const k of [...S.ext.keys()])if(k<lk)S.ext.delete(k)}
+  for(const k of [...S.hol])if(k<lk)S.hol.delete(k);for(const [k,p] of [...S.ext])if(p.end<lk)S.ext.delete(k)}
 async function load(full){
   try{
     const d=await api("/api/state");
@@ -283,7 +313,8 @@ async function load(full){
     S.base=Date.UTC(Y,M-1,D,h,mi,s);S.t0=performance.now();S.trusted=d.trusted;S.ip=d.ip;
     if(d.lang!==lang){lang=d.lang;applyLang()}
     if(full||!S.loaded){
-      S.sched=d.sched.map(a=>({h:a[0],m:a[1],mask:a[2],en:!!a[3],duration:a[4]||2}));S.hol=new Set(d.holidays);S.ext=new Map(d.extras);S.loaded=true;
+      S.sched=d.sched.map(a=>({h:a[0],m:a[1],mask:a[2],en:!!a[3],duration:a[4]||2}));S.hol=new Set(d.holidays);
+      S.ext=new Map(d.extras.map(a=>{let bells=(a[4]||[]).map(b=>({h:b[0],m:b[1],duration:b[2]}));if(a[3]!==255)bells=d.sched.filter(s=>s[3]&&(s[2]>>a[3]&1)).map(s=>({h:s[0],m:s[1],duration:s[4]||2}));return[a[0],{end:a[1]||a[0],repeat:a[2]||0,legacyTpl:a[3]!==255?a[3]:255,bells}]}));S.loaded=true;
       S.savedSignature=signature();updatePending();
       if(!cal.y){const n=devNow();cal.y=n.getUTCFullYear();cal.m=n.getUTCMonth()}
       renderSched();renderCal();
@@ -297,6 +328,7 @@ function online(ok){$("#conn").className="chip"+(ok?" ok":"");$("#connTxt").text
 /* ---------- i18n ---------- */
 function applyLang(){
   document.documentElement.lang=lang;
+  $("#excRepeatHint").textContent=lang==="fr"?"La date de début est incluse; la répétition s’arrête à la date de fin. Chaque semaine reprend le même jour.":"The first date is included; repetition stops on the end date. Weekly repetition uses the same weekday.";
   $$("[data-i]").forEach(e=>e.textContent=t(e.dataset.i));
   $("#ringLbl").textContent=ringing?t("ringing"):t("hold");
   const sel=$("#tplSel");const v=sel.value||"1";sel.innerHTML=ORDER.map(d=>`<option value="${d}">${DAY[lang][d]}</option>`).join("");sel.value=v;
@@ -304,12 +336,15 @@ function applyLang(){
 }
 
 /* ---------- accueil ---------- */
-function effDow(d){const k=key(d);if(S.ext.has(k))return S.ext.get(k);if(S.hol.has(k))return-1;return d.getUTCDay()}
+function planForDate(d){d=keyDate(key(d));for(const [start,p] of S.ext){const a=keyDate(start),b=keyDate(p.end);if(d<a||d>b)continue;const diff=(d-a)/864e5;if(diff===0||(p.repeat&&diff%p.repeat===0))return p}return null}
+function seriesStartForDate(k){const d=keyDate(k);for(const [start,p] of S.ext){const a=keyDate(start),b=keyDate(p.end),diff=(d-a)/864e5;if(d>=a&&d<=b&&(diff===0||(p.repeat&&diff%p.repeat===0)))return start}return k}
+function effDow(d){if(planForDate(d))return 7;if(S.hol.has(key(d)))return-1;return d.getUTCDay()}
 function nextRing(now){
-  for(let i=0;i<=21;i++){
-    const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+i));const e=effDow(d);if(e<0)continue;
-    const list=S.sched.filter(s=>s.en&&(s.mask>>e&1)).map(s=>s.h*60+s.m).sort((a,b)=>a-b);
-    for(const m of list){const ts=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),0,m);if(ts>now.getTime())return{ts,d,m,days:i}}
+  for(let i=0;i<=370;i++){
+    const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+i)),p=planForDate(d);let list=[];
+    if(p)list=p.bells.map(b=>b.h*60+b.m);else{const e=effDow(d);if(e<0)continue;list=S.sched.filter(s=>s.en&&(s.mask>>e&1)).map(s=>s.h*60+s.m)}
+    list.sort((a,b)=>a-b);
+    for(const m of list){const ts=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),Math.floor(m/60),m%60);if(ts>now.getTime())return{ts,d,m,days:i}}
   }return null}
 function renderClock(){
   const n=devNow();
@@ -319,7 +354,7 @@ function renderClock(){
 }
 function renderHome(){
   const n=devNow(),k=key(n);let c="school",txt=t("stSchool");
-  if(S.ext.has(k)){c="ext";txt=t("stExt")}else if(S.hol.has(k)){c="hol";txt=t("stHol")}
+  if(planForDate(n)){c="ext";txt=t("stExt")}else if(S.hol.has(k)){c="hol";txt=t("stHol")}
   else if(!S.sched.some(s=>s.en&&(s.mask>>n.getUTCDay()&1))){c="";txt=t("stOff")}
   const b=$("#todayB");b.className="badge "+c;b.textContent=txt;
   const nx=nextRing(n);let out=t("none");
@@ -336,7 +371,7 @@ setInterval(renderClock,250);setInterval(renderHome,5000);
 
 /* ---------- sonnerie manuelle (maintien) ---------- */
 let ringing=false,ringIv=null;const ringBtn=$("#ring");
-const sendRing=on=>fetch("/api/ring",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"on="+on,keepalive:true}).catch(()=>{});
+const sendRing=on=>api("/api/ring","on="+on).catch(()=>{});
 function ringStart(){if(ringing)return;ringing=true;ringBtn.classList.add("on");$("#ringLbl").textContent=t("ringing");
   if(navigator.vibrate)navigator.vibrate(40);sendRing(1);ringIv=setInterval(()=>sendRing(1),400)}
 function ringStop(){if(!ringing)return;ringing=false;clearInterval(ringIv);ringBtn.classList.remove("on");$("#ringLbl").textContent=t("hold");
@@ -364,9 +399,33 @@ function renderSched(){
 $("#addSched").onclick=()=>{if(S.sched.length>=20)return toast(t("limit"),1);S.sched.push({h:7,m:30,mask:62,en:true,duration:2});S.sched.sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));saveSched();renderSched();renderHome()};
 
 /* ---------- calendrier ---------- */
-const cal={y:0,m:0};let mode="h",rangeA=null;
+const cal={y:0,m:0};let mode="h",rangeA=null,editingExc="";
+function renderExcBells(bells){
+  const box=$("#excBellsList");box.innerHTML="";
+  bells.forEach(b=>{const row=document.createElement("div");row.className="row";
+    row.innerHTML='<input type="time" required value="'+pad(b.h)+':'+pad(b.m)+'"><label class="duration"><input type="number" min="1" max="60" value="'+b.duration+'"><span>s</span></label><button class="icon" type="button" aria-label="'+t("del")+'">✕</button>';
+    row.querySelector(".icon").onclick=()=>row.remove();box.appendChild(row);
+  });
+}
+function openExc(k){
+  editingExc=k;$("#excDate").textContent=fmtLong(k);const p=S.ext.get(k);
+  $("#excRepeat").value=String(p?p.repeat:0);$("#excEnd").value=p?p.end:k;
+  $("#excEndWrap").style.display=p&&p.repeat?"grid":"none";
+  renderExcBells(p?p.bells:[{h:7,m:30,duration:2}]);$("#excDialog").showModal();
+}
+$("#excRepeat").onchange=()=>{const r=$("#excRepeat").value;$("#excEndWrap").style.display=r==="0"?"none":"grid";if(r!=="0"&&$("#excEnd").value===editingExc){const d=keyDate(editingExc);d.setUTCDate(d.getUTCDate()+30);$("#excEnd").value=key(d)}};
+$("#addExcBell").onclick=()=>{const rows=$("#excBellsList").children;if(rows.length>=10)return toast(t("limit"),1);const last=rows[rows.length-1],v=last?last.querySelector('input[type=time]').value:"07:30",a=v.split(":").map(Number);renderExcBells([...Array.from(rows).map(r=>{const tm=r.querySelector('input[type=time]').value.split(":").map(Number);return{h:tm[0],m:tm[1],duration:+r.querySelector('input[type=number]').value||2}}),{h:a[0],m:a[1],duration:2}])};
+$("#cancelExc").onclick=()=>$("#excDialog").close();
+$("#excForm").onsubmit=e=>{
+  e.preventDefault();const repeat=+$("#excRepeat").value,end=repeat?$("#excEnd").value:editingExc;
+  const bells=Array.from($("#excBellsList").children).map(r=>{const hm=r.querySelector('input[type=time]').value.split(":").map(Number);return{h:hm[0],m:hm[1],duration:Math.max(1,Math.min(60,+r.querySelector('input[type=number]').value||2))}});
+  if(!bells.length)return toast(t("excEmpty"),1);if(repeat&&(!end||end<editingExc))return toast(t("excDateRequired"),1);
+  if([...S.ext].some(([k,p])=>k!==editingExc&&k<=end&&editingExc<=p.end))return toast(lang==="fr"?"Les périodes exceptionnelles ne peuvent pas se chevaucher.":"Exceptional periods cannot overlap.",1);
+  if(!S.ext.has(editingExc)&&S.ext.size>=30)return toast(t("limit"),1);
+  S.ext.set(editingExc,{end,repeat,legacyTpl:255,bells});S.hol.delete(editingExc);saveExt();saveHol();$("#excDialog").close();renderCal();renderHome();
+};
 function setMode(m){mode=m;rangeA=null;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
-  $("#modeHint").textContent=t(m==="h"?"hintH":m==="r"?"hintR":"hintE");$("#tpl").className="tpl"+(m==="e"?" show":"");renderCal()}
+$("#modeHint").textContent=t(m==="h"?"hintH":m==="r"?"hintR":"hintE");$("#tplHint").textContent=t("hintE");$("#tplHint").style.display=m==="e"?"block":"none";renderCal()}
 $$("#seg button").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
 $("#prev").onclick=()=>{if(--cal.m<0){cal.m=11;cal.y--}renderCal()};
 $("#next").onclick=()=>{if(++cal.m>11){cal.m=0;cal.y++}renderCal()};
@@ -379,20 +438,20 @@ function renderCal(){
   for(let i=0;i<off;i++){const p=document.createElement("button");p.className="pad";g.appendChild(p)}
   for(let d=1;d<=n;d++){
     const k=cal.y+"-"+pad(cal.m+1)+"-"+pad(d),dow=new Date(Date.UTC(cal.y,cal.m,d)).getUTCDay(),b=document.createElement("button");
-    b.textContent=d;b.className=(dow===0||dow===6?"we ":"")+(k===today?"today ":"")+(S.hol.has(k)?"hol ":"")+(S.ext.has(k)?"ext ":"")+(rangeA===k?"rs":"");
+    b.textContent=d;b.className=(dow===0||dow===6?"we ":"")+(k===today?"today ":"")+(S.hol.has(k)&&!planForDate(keyDate(k))?"hol ":"")+(planForDate(keyDate(k))?"ext ":"")+(rangeA===k?"rs":"");
     b.onclick=()=>tapDay(k);g.appendChild(b);
   }
   const lh=$("#listH"),le=$("#listE");lh.innerHTML="";le.innerHTML="";
   const mk=(box,k,cls,extra,fn)=>{const c=document.createElement("span");c.className="c "+cls;c.innerHTML=`${fmtLong(k)}${extra}<button>✕</button>`;c.querySelector("button").onclick=fn;box.appendChild(c)};
   [...S.hol].sort().forEach(k=>mk(lh,k,"h","",()=>{S.hol.delete(k);saveHol();renderCal();renderHome()}));
-  [...S.ext].sort().forEach(([k,v])=>mk(le,k,"e"," · "+DAY[lang][v].slice(0,3)+".",()=>{S.ext.delete(k);saveExt();renderCal();renderHome()}));
+  [...S.ext].sort().forEach(([k,p])=>{const suffix=(p.repeat?t(p.repeat===1?"repeatDaily":"repeatWeekly")+" · ":"")+fmtLong(p.end);mk(le,k,"e"," · "+suffix,()=>{S.ext.delete(k);saveExt();renderCal();renderHome()});le.lastChild.title=t("excTitle");le.lastChild.onclick=()=>openExc(k);le.lastChild.querySelector("button").onclick=e=>{e.stopPropagation();S.ext.delete(k);saveExt();renderCal();renderHome()};});
   if(!S.hol.size)lh.innerHTML=`<span class="hint">${t("noneList")}</span>`;
   if(!S.ext.size)le.innerHTML=`<span class="hint">${t("noneList")}</span>`;
   $("#fixed").textContent=t("fixed")+" "+cal.y;
 }
 function tapDay(k){
   if(mode==="h"){if(S.hol.has(k))S.hol.delete(k);else{if(S.hol.size>=200)return toast(t("limit"),1);S.hol.add(k);S.ext.delete(k)}saveHol();saveExt()}
-  else if(mode==="e"){if(S.ext.has(k))S.ext.delete(k);else{if(S.ext.size>=60)return toast(t("limit"),1);S.ext.set(k,+$("#tplSel").value);S.hol.delete(k)}saveExt();saveHol()}
+  else if(mode==="e"){openExc(seriesStartForDate(k));return}
   else{
     if(!rangeA){rangeA=k;toast(t("rangeStart"))}
     else{let a=keyDate(rangeA),b=keyDate(k);if(a>b)[a,b]=[b,a];
@@ -418,6 +477,7 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
 });
 
 applyLang();load(true);setInterval(()=>load(false),4000);
+if(window.KairosBle){$("#bleConnect").style.display="block";$("#bleConnect").onclick=()=>KairosBle.connect();}
 })();
 </script>
 </body>

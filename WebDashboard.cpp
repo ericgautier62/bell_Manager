@@ -4,6 +4,38 @@
 #include "I18n.h"
 #include <WiFi.h>
 
+namespace {
+bool validCalendarDate(int y, int month, int day) {
+    if (y < 2024 || y > 2100 || month < 1 || month > 12 || day < 1) return false;
+    static const uint8_t days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    int maxDay = days[month - 1];
+    if (month == 2 && (y % 400 == 0 || (y % 4 == 0 && y % 100 != 0))) maxDay = 29;
+    return day <= maxDay;
+}
+int32_t dateKey(int y, int month, int day) { return y * 10000L + month * 100L + day; }
+
+String formValue(const String& body, const char* key) {
+    String prefix = String(key) + "=";
+    int start = body.indexOf(prefix);
+    if (start < 0) return String();
+    start += prefix.length();
+    int end = body.indexOf('&', start);
+    if (end < 0) end = body.length();
+    String encoded = body.substring(start, end), decoded;
+    decoded.reserve(encoded.length());
+    for (int i = 0; i < encoded.length(); ++i) {
+        char c = encoded[i];
+        if (c == '+' ) decoded += ' ';
+        else if (c == '%' && i + 2 < encoded.length()) {
+            char hex[3] = { encoded[i + 1], encoded[i + 2], 0 };
+            decoded += (char)strtol(hex, nullptr, 16);
+            i += 2;
+        } else decoded += c;
+    }
+    return decoded;
+}
+}
+
 WebDashboard::WebDashboard(RtcManager& rtc, ScheduleManager& sched, ExceptionCalendar& holidays,
                            ExtraDays& extras, RelayController& relay, bool& timeTrusted)
     : _server(80), _rtc(rtc), _sched(sched), _holidays(holidays),
@@ -65,7 +97,7 @@ void WebDashboard::handleLogo() {
 // GET /api/state : tout l'état nécessaire à la page, en un seul JSON.
 // Aucune chaîne libre n'y figure (dates, nombres, IP) -> pas d'échappement à gérer.
 // ------------------------------------------------------------------
-void WebDashboard::handleState() {
+String WebDashboard::stateJson() {
     DateTime n = _rtc.now();
     char buf[48];
     String j;
@@ -97,13 +129,116 @@ void WebDashboard::handleState() {
     for (uint16_t i = 0; i < _extras.getCount(); i++) {
         const ExtraDay& d = _extras.get(i);
         if (i) j += ",";
-        snprintf(buf, sizeof(buf), "[\"%04u-%02u-%02u\",%u]", d.year, d.month, d.day, d.tplDow);
+        snprintf(buf, sizeof(buf), "[\"%04u-%02u-%02u\",\"%04u-%02u-%02u\",%u,%u,[",
+                 d.year, d.month, d.day, d.endYear, d.endMonth, d.endDay, d.repeatDays, d.tplDow);
         j += buf;
+        for (uint8_t b = 0; b < d.bellCount; ++b) {
+            if (b) j += ",";
+            snprintf(buf, sizeof(buf), "[%u,%u,%u]", d.bells[b].hour, d.bells[b].minute, d.bells[b].durationSeconds);
+            j += buf;
+        }
+        j += "]]";
     }
     j += "]}";
 
+    return j;
+}
+
+void WebDashboard::handleState() {
     _server.sendHeader("Cache-Control", "no-store");
-    _server.send(200, "application/json", j);
+    _server.send(200, "application/json", stateJson());
+}
+
+String WebDashboard::processApiRequest(const String& method, const String& path, const String& body) {
+    if (method == "GET" && path == "/api/state") return stateJson();
+    if (method == "POST" && path == "/api/ring") {
+        if (formValue(body, "on") == "1") _relay.holdOn();
+        else _relay.holdOff();
+        return "{\"ok\":true}";
+    }
+    if (method == "POST" && path == "/api/time") {
+        String value = formValue(body, "data");
+        int y, mo, d, h, mi, s;
+        if (sscanf(value.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6 ||
+            y < 2024 || y > 2100 || !validCalendarDate(y, mo, d) || h < 0 || h > 23 ||
+            mi < 0 || mi > 59 || s < 0 || s > 59) return "{\"ok\":false,\"error\":\"time_format\"}";
+        _rtc.adjust(DateTime(y, mo, d, h, mi, s));
+        _trusted = true;
+        return "{\"ok\":true}";
+    }
+    if (method != "POST" || path != "/api/settings") return "{\"ok\":false,\"error\":\"not_found\"}";
+
+    String schedData = formValue(body, "sched");
+    String holData = formValue(body, "hol");
+    String extData = formValue(body, "ext");
+    if (body.indexOf("sched=") < 0 || body.indexOf("hol=") < 0 || body.indexOf("ext=") < 0)
+        return "{\"ok\":false,\"error\":\"fields\"}";
+    static ScheduleEntry schedules[ScheduleManager::MAX_SCHEDULES];
+    static ExceptionDate holidays[ExceptionCalendar::MAX_EXCEPTIONS];
+    static ExtraDay extras[ExtraDays::MAX_EXTRAS];
+    uint8_t ns = 0; uint16_t nh = 0, ne = 0;
+    int start = 0;
+    while (start < (int)schedData.length()) {
+        if (ns >= ScheduleManager::MAX_SCHEDULES) return "{\"ok\":false,\"error\":\"sched_limit\"}";
+        int end = schedData.indexOf(',', start); if (end < 0) end = schedData.length();
+        String tok = schedData.substring(start, end); start = end + 1;
+        int h, m, mask, enabled, duration;
+        if (sscanf(tok.c_str(), "%d:%d:%d:%d:%d", &h, &m, &mask, &enabled, &duration) != 5 ||
+            h < 0 || h > 23 || m < 0 || m > 59 || mask < 0 || mask > 127 ||
+            (enabled != 0 && enabled != 1) || duration < 1 || duration > 60)
+            return "{\"ok\":false,\"error\":\"sched_format\"}";
+        schedules[ns++] = { (uint8_t)h, (uint8_t)m, (uint8_t)mask, enabled != 0, (uint8_t)duration };
+    }
+    start = 0;
+    while (start < (int)holData.length()) {
+        if (nh >= ExceptionCalendar::MAX_EXCEPTIONS) return "{\"ok\":false,\"error\":\"hol_limit\"}";
+        int end = holData.indexOf(',', start); if (end < 0) end = holData.length();
+        String tok = holData.substring(start, end); start = end + 1;
+        int y, mo, d;
+        if (sscanf(tok.c_str(), "%d-%d-%d", &y, &mo, &d) != 3 || !validCalendarDate(y, mo, d))
+            return "{\"ok\":false,\"error\":\"hol_format\"}";
+        holidays[nh++] = { (uint16_t)y, (uint8_t)mo, (uint8_t)d };
+    }
+    start = 0;
+    while (start < (int)extData.length()) {
+        if (ne >= ExtraDays::MAX_EXTRAS) return "{\"ok\":false,\"error\":\"ext_limit\"}";
+        int end = extData.indexOf(',', start); if (end < 0) end = extData.length();
+        String tok = extData.substring(start, end); start = end + 1;
+        int y, mo, d, ey, em, ed, repeat, tpl, consumed = 0;
+        if (sscanf(tok.c_str(), "%d-%d-%d:%d-%d-%d:%d:%d:%n", &y, &mo, &d, &ey, &em, &ed, &repeat, &tpl, &consumed) != 8 ||
+            !validCalendarDate(y, mo, d) || !validCalendarDate(ey, em, ed) ||
+            dateKey(ey, em, ed) < dateKey(y, mo, d) ||
+            (repeat != 0 && repeat != 1 && repeat != 7) || (tpl != 255 && (tpl < 0 || tpl > 6)))
+            return "{\"ok\":false,\"error\":\"ext_format\"}";
+        ExtraDay plan{};
+        plan.year = y; plan.month = mo; plan.day = d;
+        plan.endYear = ey; plan.endMonth = em; plan.endDay = ed;
+        plan.repeatDays = repeat; plan.tplDow = tpl;
+        String bells = tok.substring(consumed);
+        int bs = 0;
+        while (bs < (int)bells.length()) {
+            if (plan.bellCount >= ExtraDays::MAX_BELLS) return "{\"ok\":false,\"error\":\"bell_limit\"}";
+            int be = bells.indexOf('/', bs); if (be < 0) be = bells.length();
+            String bell = bells.substring(bs, be); bs = be + 1;
+            int bh, bm, duration;
+            if (sscanf(bell.c_str(), "%d-%d-%d", &bh, &bm, &duration) != 3 ||
+                bh < 0 || bh > 23 || bm < 0 || bm > 59 || duration < 1 || duration > 60)
+                return "{\"ok\":false,\"error\":\"bell_format\"}";
+            plan.bells[plan.bellCount++] = { (uint8_t)bh, (uint8_t)bm, (uint8_t)duration };
+        }
+        if (tpl == 255 && plan.bellCount == 0) return "{\"ok\":false,\"error\":\"bell_required\"}";
+        for (uint16_t i = 0; i < ne; ++i) {
+            const ExtraDay& prior = extras[i];
+            if (dateKey(y, mo, d) <= dateKey(prior.endYear, prior.endMonth, prior.endDay) &&
+                dateKey(prior.year, prior.month, prior.day) <= dateKey(ey, em, ed))
+                return "{\"ok\":false,\"error\":\"ext_overlap\"}";
+        }
+        extras[ne++] = plan;
+    }
+    _sched.replaceAll(schedules, ns);
+    _holidays.replaceAll(holidays, nh);
+    _extras.replaceAll(extras, ne);
+    return "{\"ok\":true}";
 }
 
 // ------------------------------------------------------------------
@@ -144,9 +279,35 @@ void WebDashboard::handleSettings() {
         if (ne >= ExtraDays::MAX_EXTRAS) { sendError("ext_limit"); return; }
         int end = extData.indexOf(',', start); if (end < 0) end = extData.length();
         String tok = extData.substring(start, end); start = end + 1;
-        int y, mo, d, tpl;
-        if (sscanf(tok.c_str(), "%d-%d-%d:%d", &y, &mo, &d, &tpl) != 4 || y < 2024 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31 || tpl < 0 || tpl > 6) { sendError("ext_format"); return; }
-        extras[ne++] = { (uint16_t)y, (uint8_t)mo, (uint8_t)d, (uint8_t)tpl };
+        int y, mo, d, ey, em, ed, repeat, tpl, consumed = 0;
+        if (sscanf(tok.c_str(), "%d-%d-%d:%d-%d-%d:%d:%d:%n", &y, &mo, &d, &ey, &em, &ed, &repeat, &tpl, &consumed) != 8 ||
+            !validCalendarDate(y, mo, d) || !validCalendarDate(ey, em, ed) ||
+            dateKey(ey, em, ed) < dateKey(y, mo, d) ||
+            (repeat != 0 && repeat != 1 && repeat != 7) || (tpl != 255 && (tpl < 0 || tpl > 6))) { sendError("ext_format"); return; }
+        ExtraDay plan{};
+        plan.year = y; plan.month = mo; plan.day = d;
+        plan.endYear = ey; plan.endMonth = em; plan.endDay = ed;
+        plan.repeatDays = repeat; plan.tplDow = tpl;
+        String bells = tok.substring(consumed);
+        int bs = 0;
+        while (bs < (int)bells.length()) {
+            if (plan.bellCount >= ExtraDays::MAX_BELLS) { sendError("bell_limit"); return; }
+            int be = bells.indexOf('/', bs); if (be < 0) be = bells.length();
+            String bell = bells.substring(bs, be); bs = be + 1;
+            int bh, bm, duration;
+            if (sscanf(bell.c_str(), "%d-%d-%d", &bh, &bm, &duration) != 3 ||
+                bh < 0 || bh > 23 || bm < 0 || bm > 59 || duration < 1 || duration > 60) { sendError("bell_format"); return; }
+            plan.bells[plan.bellCount++] = { (uint8_t)bh, (uint8_t)bm, (uint8_t)duration };
+        }
+        if (tpl == 255 && plan.bellCount == 0) { sendError("bell_required"); return; }
+        for (uint16_t i = 0; i < ne; ++i) {
+            const ExtraDay& prior = extras[i];
+            if (dateKey(y, mo, d) <= dateKey(prior.endYear, prior.endMonth, prior.endDay) &&
+                dateKey(prior.year, prior.month, prior.day) <= dateKey(ey, em, ed)) {
+                sendError("ext_overlap"); return;
+            }
+        }
+        extras[ne++] = plan;
     }
     _sched.replaceAll(schedules, ns);
     _holidays.replaceAll(holidays, nh);
@@ -202,28 +363,7 @@ void WebDashboard::handleHolidays() {
     sendOk();
 }
 
-void WebDashboard::handleExtras() {
-    if (!_server.hasArg("data")) { sendError("data"); return; }
-    String data = _server.arg("data");
-
-    ExtraDay list[ExtraDays::MAX_EXTRAS];
-    uint16_t n = 0;
-    int start = 0;
-    while (start <= (int)data.length() && n < ExtraDays::MAX_EXTRAS) {
-        int end = data.indexOf(',', start);
-        if (end < 0) end = data.length();
-        String tok = data.substring(start, end);
-        start = end + 1;
-        if (tok.length() == 0) continue;
-
-        int y, mo, d, tpl;
-        if (sscanf(tok.c_str(), "%d-%d-%d:%d", &y, &mo, &d, &tpl) != 4) { sendError("format"); return; }
-        if (y < 2024 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31 || tpl < 0 || tpl > 6) { sendError("range"); return; }
-        list[n++] = { (uint16_t)y, (uint8_t)mo, (uint8_t)d, (uint8_t)tpl };
-    }
-    _extras.replaceAll(list, n);
-    sendOk();
-}
+void WebDashboard::handleExtras() { sendError("use_settings"); }
 
 // POST /api/ring  on=1 : appui maintenu (répété toutes les 400 ms par la page)
 //                 on=0 : relâché. Le watchdog du RelayController coupe tout seul

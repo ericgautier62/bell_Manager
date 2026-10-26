@@ -77,9 +77,18 @@ void ScheduleManager::update(RtcManager& rtc, ExceptionCalendar& holidays, Extra
     if (relay.isHeld()) return;   // sonnerie manuelle en cours : on ne s'y superpose pas
 
     uint8_t effectiveDow = now.dayOfTheWeek();   // 0=dimanche ... 6=samedi
-    uint8_t tpl;
-    if (extras.find(now.year(), now.month(), now.day(), &tpl)) {
-        effectiveDow = tpl;                      // jour exceptionnel : horaire d'un autre jour
+    const ExtraDay* exceptional = extras.find(now.year(), now.month(), now.day());
+    if (exceptional && exceptional->tplDow == 255) {
+        for (uint8_t i = 0; i < exceptional->bellCount; ++i) {
+            const ExceptionalBell& bell = exceptional->bells[i];
+            if (bell.hour == now.hour() && bell.minute == now.minute()) {
+                relay.ringFor((uint32_t)bell.durationSeconds * 1000UL);
+                return;
+            }
+        }
+        return;                                   // l'exception remplace l'horaire hebdomadaire
+    } else if (exceptional) {
+        effectiveDow = exceptional->tplDow;      // ancienne exception : horaire d'un jour modèle
     } else if (holidays.isException(now.year(), now.month(), now.day())) {
         return;                                  // férié / vacances
     }

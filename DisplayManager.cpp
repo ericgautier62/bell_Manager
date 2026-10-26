@@ -13,6 +13,10 @@ void DisplayManager::begin() {
     _u8g2.setFontPosTop();
 }
 
+void DisplayManager::setPowerSave(bool enabled) {
+    _u8g2.setPowerSave(enabled ? 1 : 0);
+}
+
 void DisplayManager::displayMenu(const Menu& menu) {
     const size_t VISIBLE_ITEMS = 4; // 20,31,42,53 px -> tient dans 64px de haut
     size_t total = menu.getItemCount();

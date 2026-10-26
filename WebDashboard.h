@@ -20,6 +20,9 @@ public:
     void stop();           // libère le port 80 (nécessaire avant le portail Wi-Fi)
     void handle();         // à appeler très souvent
     bool running() const { return _running; }
+    // API partagée par le serveur HTTP et le transport BLE.
+    String stateJson();
+    String processApiRequest(const String& method, const String& path, const String& body);
 
 private:
     WebServer _server;

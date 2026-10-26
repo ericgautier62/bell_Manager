@@ -23,8 +23,9 @@ public:
 
     // --- Portail de configuration (hotspot "KairosLab-Setup") ---
     bool startPortal();                // true si le hotspot a démarré
-    void processPortal();              // à appeler en boucle tant que le portail est ouvert
+    bool processPortal();              // true si le nouveau réseau est connecté
     bool portalActive() const;
+    uint8_t portalConnectionStatus() const;
     unsigned long portalElapsedMs() const;
     void stopPortal();                 // ferme le portail et reprend la connexion normale
 
@@ -35,6 +36,7 @@ private:
 
     WiFiManager* _wm = nullptr;
     unsigned long _portalStartMs = 0;
+    uint8_t _portalConnectionStatus = 0; // WL_IDLE_STATUS tant qu'aucune tentative n'a abouti
     bool _wasConnected = false;
     unsigned long _lastSyncMs = 0;
     bool _everSynced = false;

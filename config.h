@@ -12,6 +12,10 @@
 #define ENC_CLK  2
 #define ENC_DT   3
 #define ENC_SW   4
+// Transitions quadrature nécessaires pour valider un cran mécanique.
+// 4 convient aux encodeurs à crans courants (ex. KY-040) et évite
+// qu'un seul cran soit compté plusieurs fois.
+#define ENCODER_TRANSITIONS_PER_STEP 4
 
 // Relais de sonnerie (GPIO5 : libre, ni strapping ni LED)
 #define PIN_RELAY 5
@@ -32,6 +36,11 @@
 #define DISPLAY_REFRESH_MS 30
 #define ENCODER_DEBOUNCE_MS 5
 #define IDLE_TIMEOUT_MS 120000  // 2 minutes avant les animations de veille
+
+// Mode nuit automatique : le programme et les sonneries restent actifs.
+#define NIGHT_MODE_START_HOUR 17
+#define NIGHT_MODE_END_HOUR 6
+#define NIGHT_MODE_SCREEN_WAKE_MS 30000UL
 
 // ---------------- Réseau / heure ----------------
 #define AP_NAME            "KairosLab-Setup"   // hotspot de configuration Wi-Fi

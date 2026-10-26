@@ -15,7 +15,8 @@ static const int8_t QUAD_TABLE[16] = {
 
 Encoder::Encoder(uint8_t clk, uint8_t dt, uint8_t sw)
     : _clk(clk), _dt(dt), _sw(sw),
-      _counter(0), _lastState(0), _mux(portMUX_INITIALIZER_UNLOCKED),
+      _counter(0), _lastState(0), _quarterSteps(0),
+      _mux(portMUX_INITIALIZER_UNLOCKED),
       _lastBtnReading(HIGH), _lastBtnStable(HIGH),
       _lastBtnChangeMs(0), _btnPressed(false) {}
 
@@ -26,6 +27,7 @@ void Encoder::begin() {
 
     _instance = this;
     _lastState = (digitalRead(_clk) << 1) | digitalRead(_dt);
+    _quarterSteps = 0;
 
     // On écoute les deux voies : c'est nécessaire pour que la table
     // de transition quadrature fonctionne correctement.
@@ -51,7 +53,14 @@ void IRAM_ATTR Encoder::handleInterrupt() {
     int8_t movement = QUAD_TABLE[index];
     if (movement != 0) {
         portENTER_CRITICAL_ISR(&_mux);
-        _counter += movement;
+        _quarterSteps += movement;
+        if (_quarterSteps >= ENCODER_TRANSITIONS_PER_STEP) {
+            ++_counter;
+            _quarterSteps = 0;
+        } else if (_quarterSteps <= -ENCODER_TRANSITIONS_PER_STEP) {
+            --_counter;
+            _quarterSteps = 0;
+        }
         portEXIT_CRITICAL_ISR(&_mux);
     }
     _lastState = current;
@@ -67,6 +76,7 @@ int Encoder::getCounter() {
 void Encoder::resetCounter() {
     portENTER_CRITICAL(&_mux);
     _counter = 0;
+    _quarterSteps = 0;
     portEXIT_CRITICAL(&_mux);
 }
 
